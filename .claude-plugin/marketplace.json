@@ -1,0 +1,12 @@
+{
+  "name": "issue-loop",
+  "plugins": [
+    {
+      "name": "issue-loop",
+      "source": "./"
+    }
+  ],
+  "owner": {
+    "name": "coucha"
+  }
+}
