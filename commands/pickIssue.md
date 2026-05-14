@@ -1,6 +1,6 @@
 ---
 description: "GitHub から最優先で取り組むべき Issue を1つ選んで current-issue.md に書き出す"
-allowed-tools: ["Bash(gh issue list:*)", "Bash(gh issue view:*)", "Bash(gh pr list:*)", "Read", "Write"]
+allowed-tools: ["Bash(gh issue list *)", "Bash(gh issue view *)", "Bash(gh pr list *)", "Read", "Write"]
 ---
 
 # Pick Issue

@@ -1,6 +1,6 @@
 ---
 description: "Issue の不足情報をユーザーへ質問し、回答を Issue にコメントとして追記する"
-allowed-tools: ["Bash(gh issue comment:*)", "Bash(gh issue view:*)", "Read", "Write", "AskUserQuestion"]
+allowed-tools: ["Bash(gh issue comment *)", "Bash(gh issue view *)", "Read", "Write", "AskUserQuestion"]
 ---
 
 # Info Gathering

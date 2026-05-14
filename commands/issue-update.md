@@ -1,6 +1,6 @@
 ---
 description: "out-of-scope.md の発見事項と既存 Issue を照合し、重複のない新規 Issue を登録する"
-allowed-tools: ["Bash(gh issue create:*)", "Bash(gh issue list:*)", "Bash(gh issue view:*)", "Read"]
+allowed-tools: ["Bash(gh issue create *)", "Bash(gh issue list *)", "Bash(gh issue view *)", "Read"]
 ---
 
 # Issue Update
