@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。GitHub の Issue を自動的に選び、実装・レビュー・PR 作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh:*)"]
+allowed-tools: ["Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh:*)", "Read", "Write", "Bash(git checkout -b:*)", "Bash(gh issue comment:*)", "Skill"]
 ---
 
 # Issue Loop
