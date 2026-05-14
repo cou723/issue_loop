@@ -20,7 +20,16 @@ STATUS=$(echo "$FRONTMATTER" | grep '^status:' | sed 's/status: *//' || echo "ac
 STATE_SESSION=$(echo "$FRONTMATTER" | grep '^session_id:' | sed 's/session_id: *//' || true)
 
 HOOK_SESSION=$(echo "$HOOK_INPUT" | jq -r '.session_id // ""')
-if [[ -n "$STATE_SESSION" ]] && [[ "$STATE_SESSION" != "$HOOK_SESSION" ]]; then
+
+# session_id が未設定の場合、現在のセッションにバインドする
+if [[ -z "$STATE_SESSION" ]]; then
+  TEMP_FILE="${STATE_FILE}.tmp.$$"
+  sed "s/^session_id:.*$/session_id: $HOOK_SESSION/" "$STATE_FILE" > "$TEMP_FILE"
+  mv "$TEMP_FILE" "$STATE_FILE"
+  STATE_SESSION="$HOOK_SESSION"
+fi
+
+if [[ "$STATE_SESSION" != "$HOOK_SESSION" ]]; then
   exit 0
 fi
 
