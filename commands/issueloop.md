@@ -69,32 +69,36 @@ git の書き込み操作 (`git add`, `git commit`, `git push`) は直接コマ�
 - コミットのみ: `commit-commands:commit` スキル
 - コミット+プッシュ+PR 作成: `commit-commands:commit-push-pr` スキル
 
-## ステップ 1: Issue 選定
+## ステップ 1: PR 同期
+
+Skill ツールを使用して `issue-loop:pr-sync` スキルを実行する。
+
+## ステップ 2: Issue 選定
 
 Skill ツールを使用して `issue-loop:pickIssue` スキルを実行する。
 
-## ステップ 2: Issue 確認
+## ステップ 3: Issue 確認
 
 `.claude/issue-loop/current-issue.md` を読む。
 `title: "NO_ISSUE"` の場合:
 - `.claude/issue-loop.local.md` を読み、フロントマターの `status: active` を `status: done` に変更して保存する
 - 処理を終了する（Stop hook がループを終了させる）
 
-## ステップ 3: 情報収集
+## ステップ 4: 情報収集
 
 Skill ツールを使用して `issue-loop:infoGathering` スキルを実行する。
 
-## ステップ 4: Issue 分類
+## ステップ 5: Issue 分類
 
 Skill ツールを使用して `issue-loop:pattern` スキルを実行する。
 
-## ステップ 5: ブランチ作成
+## ステップ 6: ブランチ作成
 
 `.claude/issue-loop/current-issue.md` を読んでIssue番号とタイトルを取得する。
 ブランチ名を `issue-<番号>-<kebab-case-slug>` 形式で決定する（タイトルから英数字・ハイフンのみ使用）。
 `git checkout -b <ブランチ名>` を実行する。
 
-## ステップ 6: 実装またはデバッグ
+## ステップ 7: 実装またはデバッグ
 
 `.claude/issue-loop/next-action.md` を読む。
 `.claude/issue-loop/out-of-scope.md` が存在する場合は空にしてリセットする。
@@ -102,7 +106,7 @@ Skill ツールを使用して `issue-loop:pattern` スキルを実行する。
 - `implement` の場合: Skill ツールを使用して `issue-loop:implement` スキルを実行する
 - `debug` の場合: Skill ツールを使用して `issue-loop:debug` スキルを実行する
 
-## ステップ 7: レビューループ
+## ステップ 8: レビューループ
 
 `.claude/issue-loop.local.md` から `max_review_iterations` を読む。
 
@@ -112,14 +116,14 @@ a. Skill ツールを使用して `issue-loop:review` スキルを実行する
 
 b. `.claude/issue-loop/review-result.md` を読む:
    - `status: pass` → ループを抜ける
-   - `status: fail` かつ上限未到達 → `review-result.md` のスコープ内指摘を参照しながら、ステップ 6 と同じ種類のスキル（implement または debug）を再実行する
+   - `status: fail` かつ上限未到達 → `review-result.md` のスコープ内指摘を参照しながら、ステップ 7 と同じ種類のスキル（implement または debug）を再実行する
    - 上限到達 → ループを抜ける
 
-## ステップ 8: Issue 更新
+## ステップ 9: Issue 更新
 
 Skill ツールを使用して `issue-loop:issue-update` スキルを実行する。
 
-## ステップ 9: PR 作成
+## ステップ 10: PR 作成
 
 Skill ツールを使用して `issue-loop:push-and-pr` スキルを実行する。
 ```

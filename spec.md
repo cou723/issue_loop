@@ -12,7 +12,8 @@ Claude Code をはじめとするコーディングエージェントで動く�
 
 ### Agents（コンテキストを分離して実行するサブエージェント）
 
-- **`/pickIssue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係や既存PRの有無を考慮して判断する
+- **`/pr-sync`**：前回チェック時点との差分を取得し、マージ済みPRと新規コメントが付いたPRを検出する。新規コメント付きPRからは Issue を自動作成し、重複防止のためPRにコメントで記録する。結果を `pr-context.md` に書き出す
+- **`/pickIssue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報を考慮して判断する
 - **`/infoGathering`**：Issue の不足情報を `AskUserQuestion` で同期的にユーザーへ質問し、回答をコメントとして Issue に追記する
 - **`/pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
 - **`/implement`**：実装を行う。`feature-dev:feature-dev` スキルに委譲し、完了後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
@@ -23,6 +24,8 @@ Claude Code をはじめとするコーディングエージェントで動く�
 ## ループのフロー（1イテレーション）
 
 ```
+/pr-sync
+  ↓  pr-snapshot.md を更新、pr-context.md に差分を書き出す
 /pickIssue
   ↓  current-issue.md に書き出す
 /infoGathering
@@ -82,6 +85,8 @@ Stop hook の動作：
 
 | ファイル | 書き込み | 読み込み | 用途 |
 |---|---|---|---|
+| `pr-snapshot.json` | /pr-sync | /pr-sync | 前回チェック時刻（`checked_at`）を保持するJSON |
+| `pr-context.md` | /pr-sync | /pickIssue | 前回チェックからの差分（マージ済みPR一覧・新規コメント起因のIssue一覧） |
 | `current-issue.md` | /pickIssue, /infoGathering, /pattern | /pattern, /implement, /debug | Issue の詳細・収集情報・タイプ |
 | `next-action.md` | /pattern, /review | /issueloop | `implement` または `debug` の判定結果 |
 | `review-result.md` | /review | /implement, /debug, /issueloop | レビュー結果・指摘内容・推奨アクション・合否 |
@@ -111,6 +116,59 @@ next-action: implement | debug
 ```
 
 スコープ外の指摘は `out-of-scope.md` にも追記し、`/issue-update` が既存 Issue と照合して登録する。
+
+## /pr-sync の詳細設計
+
+### 目的
+
+前回チェック時点との差分を検出し、以下の2つの情報を後続ステップに渡す。
+
+- **マージ済みPR**: `pickIssue` が依存関係を解消済みと判断するために使う
+- **新規コメント付きPR**: フィードバックを Issue 化して次のイテレーションで対応できるようにする
+
+### pr-snapshot.json の構造
+
+```json
+{
+  "checked_at": "<ISO8601>"
+}
+```
+
+差分検出はすべて `scripts/pr-sync-gather.sh` がシェルスクリプトで行う。
+
+### 差分検出ロジック（スクリプト内）
+
+- **マージ済みPR**: `gh pr list --state merged` の `mergedAt` を `checked_at` と `jq` で比較
+- **新規コメント付きPR**: `gh pr list --state open --json comments` の `createdAt` を `checked_at` と比較し、`[issue-loop]` 始まりのコメントは除外
+
+差分収集後、`checked_at` を現在時刻で更新してスナップショットを上書きする。
+
+### AIが判断する部分
+
+`prs_with_new_comments` に挙がったPRのコメントを `gh pr view --comments` で取得し、修正・改善・バグを示唆するものかを判断してIssueを作成する。
+
+### Issue 自動作成と重複防止
+
+新規コメントが「修正・改善を示唆している」と判断した場合に Issue を作成する。
+
+重複を防ぐため、Issue 作成後に対象PRへ以下の形式でコメントを投稿する:
+
+```
+[issue-loop] Issue #<number> を作成しました: <title>
+```
+
+スキャン時に既存PRコメントにこの形式が含まれていれば、そのコメントからは Issue を作成しない。
+
+### pr-context.md の構造
+
+```markdown
+## マージされたPR
+- #42: "Fix auth bug"
+- #38: "Add user profile page"
+
+## 新規コメントから作成したIssue
+- Issue #55（PR #40 のコメントより）: "エラーメッセージが不親切"
+```
 
 ## /review の詳細設計
 
@@ -144,6 +202,7 @@ next-action: implement | debug
 | コンポーネント | 主要な allowed-tools |
 |---|---|
 | `/issueloop` | `Bash(bash *setup-issue-loop.sh:*)`, `Bash(git checkout -b:*)`, `Task` |
+| `/pr-sync` | `Bash(gh pr list:*)`, `Bash(gh pr view:*)`, `Bash(gh issue create:*)`, `Bash(gh pr comment:*)`, `Read`, `Write` |
 | `/pickIssue` | `Bash(gh issue list:*)`, `Bash(gh issue view:*)`, `Bash(gh pr list:*)`, `Read`, `Write` |
 | `/infoGathering` | `Bash(gh issue comment:*)`, `Bash(gh issue view:*)`, `Read`, `Write`, `Task` |
 | `/pattern` | `Read(.claude/issue-loop/current-issue.md)`, `Write(.claude/issue-loop/next-action.md)` |
