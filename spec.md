@@ -19,7 +19,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 - **`/implement`**：実装を行う。`feature-dev:feature-dev` スキルに委譲し、完了後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
 - **`/debug`**：デバッグを行う。`feature-dev:code-explorer` エージェントを内部で活用する独自実装。最後にスコープ外の発見事項を書き出す
 - **`/review`**：複数の専門エージェントを並列実行して変更内容をレビューする。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
-- **`/issue-update`**：`/implement` や `/debug` が書き出したスコープ外の発見事項と既存 Issue を照合し、重複のない新規 Issue を登録する
+- **`/issue-update`**：`/implement` や `/debug` が書き出したスコープ外の発見事項を統合・整理したうえで既存 Issue と照合し、重複のない新規 Issue を登録する
 
 ## ループのフロー（1イテレーション）
 
