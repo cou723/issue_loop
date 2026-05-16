@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop の初期セットアップ。重複チェック・.gitignore 確認・状態ファイル作成を行う"
 argument-hint: "--max-iterations N --max-review-iterations M"
-allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop)", "Read", "Write"]
+allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop)", "Bash(echo $CLAUDE_PLUGIN_ROOT)", "Read", "Write", "Edit(.gitignore)"]
 ---
 
 # Issue Loop セットアップ
@@ -35,6 +35,17 @@ allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop
 
 `mkdir -p .issue-loop` を実行する。
 
+## ステップ 3.5: PR同期ラッパースクリプト作成
+
+`echo "$CLAUDE_PLUGIN_ROOT"` を実行してプラグインのルートパスを取得する（以下 PLUGIN_ROOT と呼ぶ）。
+
+Write ツールで `.issue-loop/pr-sync-gather.sh` を以下の内容で作成する（`<PLUGIN_ROOT>` を取得した実際のパスに置換すること）:
+
+```
+#!/bin/bash
+bash "<PLUGIN_ROOT>/scripts/pr-sync-gather.sh" "$@"
+```
+
 ## ステップ 4: イテレーションプロンプトファイル作成
 
 Write ツールで `.issue-loop/iteration-prompt.md` を以下の内容で作成する:
@@ -50,6 +61,8 @@ Write ツールで `.issue-loop/iteration-prompt.md` を以下の内容で作成
 git の書き込み操作 (`git add`, `git commit`, `git push`) は直接コマンドを叩かず、必ず対応する Skill を使うこと。
 - コミットのみ: `commit-commands:commit` スキル
 - コミット+プッシュ+PR 作成: `commit-commands:commit-push-pr` スキル
+
+`issue-loop:setup` スキルは絶対に呼ばないこと（セットアップ済み）。エラーが発生しても再セットアップは不要。
 
 ## ステップ 1: PR 同期
 
@@ -108,6 +121,10 @@ Skill ツールを使用して `issue-loop:issue-update` スキルを実行す�
 ## ステップ 10: PR 作成
 
 Skill ツールを使用して `issue-loop:push-and-pr` スキルを実行する。
+
+## ステップ 11: イテレーション完了フラグ作成
+
+`touch .issue-loop/iteration-done` を実行する。
 ```
 
 ## ステップ 5: 状態ファイル作成

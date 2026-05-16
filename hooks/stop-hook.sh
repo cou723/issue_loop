@@ -63,8 +63,6 @@ if [[ $MAX_ITERATIONS -gt 0 ]] && [[ $ITERATION -ge $MAX_ITERATIONS ]]; then
   exit 0
 fi
 
-NEXT_ITERATION=$((ITERATION + 1))
-
 PROMPT_TEXT=$(awk '/^---$/{i++; next} i>=2' "$STATE_FILE")
 
 if [[ -z "$PROMPT_TEXT" ]]; then
@@ -72,6 +70,18 @@ if [[ -z "$PROMPT_TEXT" ]]; then
   rm "$STATE_FILE"
   exit 0
 fi
+
+DONE_FLAG=".issue-loop/iteration-done"
+if [[ ! -f "$DONE_FLAG" ]]; then
+  jq -n \
+    --arg prompt "$PROMPT_TEXT" \
+    --arg msg "🔁 Issue loop: イテレーション $ITERATION / $(if [[ $MAX_ITERATIONS -gt 0 ]]; then echo $MAX_ITERATIONS; else echo '∞'; fi) を再実行します（未完了のため）" \
+    '{"decision": "block", "reason": $prompt, "systemMessage": $msg}'
+  exit 0
+fi
+rm -f "$DONE_FLAG"
+
+NEXT_ITERATION=$((ITERATION + 1))
 
 TEMP_FILE="${STATE_FILE}.tmp.$$"
 sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$STATE_FILE" > "$TEMP_FILE"
