@@ -18,9 +18,9 @@ allowed-tools: ["Skill(commit-commands:commit-push-pr)", "Bash(git add *)", "Bas
 1. `mcp__plugin_playwright_playwright__browser_navigate` で `http://localhost:5173/` を開く
 2. `mcp__plugin_playwright_playwright__browser_take_screenshot` でスクリーンショットを撮影する（base64データを取得）
 3. `mcp__plugin_playwright_playwright__browser_close` でブラウザを閉じる
-4. `mkdir -p .claude/screenshots` を実行する
-5. 取得した base64 データを `echo "<base64>" | base64 -d > .claude/screenshots/pr-ui.png` でファイルに保存する
-6. `git add .claude/screenshots/ && git commit -m "docs: add UI screenshots for PR review"` でコミットする
+4. `mkdir -p .screenshots` を実行する
+5. 取得した base64 データを `echo "<base64>" | base64 -d > .screenshots/pr-ui.png` でファイルに保存する
+6. `git add .screenshots/ && git commit -m "docs: add UI screenshots for PR review"` でコミットする
 
 ## ステップ 2: コミット・プッシュ・PR作成
 
@@ -34,5 +34,5 @@ allowed-tools: ["Skill(commit-commands:commit-push-pr)", "Bash(git add *)", "Bas
    ```bash
    gh pr comment --body "## スクリーンショット
 
-   ![UI screenshot](https://raw.githubusercontent.com/<owner>/<repo>/<branch>/.claude/screenshots/pr-ui.png)"
+   ![UI screenshot](https://raw.githubusercontent.com/<owner>/<repo>/<branch>/.screenshots/pr-ui.png)"
    ```

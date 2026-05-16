@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。GitHub の Issue を自動的に選び、実装・レビュー・PR 作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Bash(mkdir -p .claude/issue-loop)", "Bash(test -f .issue-loop.local.md)", "Read", "Write", "Bash(git checkout -b *)", "Bash(gh issue comment *)", "Skill"]
+allowed-tools: ["Bash(mkdir -p .issue-loop)", "Bash(test -f .issue-loop.local.md)", "Read", "Write", "Bash(git checkout -b *)", "Bash(gh issue comment *)", "Skill"]
 ---
 
 # Issue Loop
@@ -51,7 +51,7 @@ STOPPING:
 
 **3. ディレクトリ作成**
 
-`mkdir -p .claude/issue-loop` を実行する。
+`mkdir -p .issue-loop` を実行する。
 
 **4. イテレーションプロンプトファイル作成**
 
