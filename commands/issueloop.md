@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。GitHub の Issue を自動的に選び、実装・レビュー・PR 作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Bash(mkdir -p .claude/issue-loop)", "Bash(test -f .claude/issue-loop.local.md)", "Read", "Write", "Bash(git checkout -b *)", "Bash(gh issue comment *)", "Skill"]
+allowed-tools: ["Bash(mkdir -p .claude/issue-loop)", "Bash(test -f .issue-loop.local.md)", "Read", "Write", "Bash(git checkout -b *)", "Bash(gh issue comment *)", "Skill"]
 ---
 
 # Issue Loop
@@ -33,7 +33,7 @@ STOPPING:
 
 **1. 重複チェック**
 
-`test -f .claude/issue-loop.local.md && echo "EXISTS" || echo "NOT_FOUND"` を実行する。
+`test -f .issue-loop.local.md && echo "EXISTS" || echo "NOT_FOUND"` を実行する。
 
 `EXISTS` の場合、以下を表示して終了する:
 ```
@@ -43,10 +43,10 @@ STOPPING:
 
 **2. .gitignore チェック**
 
-`.gitignore` に `.claude/issue-loop*` が含まれているか確認する。含まれていない場合は `.gitignore` に以下を追記する:
+`.gitignore` に `.issue-loop*` が含まれているか確認する。含まれていない場合は `.gitignore` に以下を追記する:
 
 ```
-.claude/issue-loop*
+.issue-loop*
 ```
 
 **3. ディレクトリ作成**
@@ -55,12 +55,12 @@ STOPPING:
 
 **4. イテレーションプロンプトファイル作成**
 
-Write ツールで `.claude/issue-loop/iteration-prompt.md` を以下の内容で作成する:
+Write ツールで `.issue-loop/iteration-prompt.md` を以下の内容で作成する:
 
 ```
 # Issue Loop - 1イテレーション実行
 
-`.claude/issue-loop.local.md` から `max_review_iterations` の値を取得して使用する。
+`.issue-loop.local.md` から `max_review_iterations` の値を取得して使用する。
 エラーが発生した場合は `gh issue comment <number> --body "自動化失敗: <理由>"` を実行して次のステップへ進む。
 
 ## 共通ルール
@@ -79,9 +79,9 @@ Skill ツールを使用して `issue-loop:pickIssue` スキルを実行する�
 
 ## ステップ 3: Issue 確認
 
-`.claude/issue-loop/current-issue.md` を読む。
+`.issue-loop/current-issue.md` を読む。
 `title: "NO_ISSUE"` の場合:
-- `.claude/issue-loop.local.md` を読み、フロントマターの `status: active` を `status: done` に変更して保存する
+- `.issue-loop.local.md` を読み、フロントマターの `status: active` を `status: done` に変更して保存する
 - 処理を終了する（Stop hook がループを終了させる）
 
 ## ステップ 4: 情報収集
@@ -94,27 +94,27 @@ Skill ツールを使用して `issue-loop:pattern` スキルを実行する。
 
 ## ステップ 6: ブランチ作成
 
-`.claude/issue-loop/current-issue.md` を読んでIssue番号とタイトルを取得する。
+`.issue-loop/current-issue.md` を読んでIssue番号とタイトルを取得する。
 ブランチ名を `issue-<番号>-<kebab-case-slug>` 形式で決定する（タイトルから英数字・ハイフンのみ使用）。
 `git checkout -b <ブランチ名>` を実行する。
 
 ## ステップ 7: 実装またはデバッグ
 
-`.claude/issue-loop/next-action.md` を読む。
-`.claude/issue-loop/out-of-scope.md` が存在する場合は空にしてリセットする。
+`.issue-loop/next-action.md` を読む。
+`.issue-loop/out-of-scope.md` が存在する場合は空にしてリセットする。
 
 - `implement` の場合: Skill ツールを使用して `issue-loop:implement` スキルを実行する
 - `debug` の場合: Skill ツールを使用して `issue-loop:debug` スキルを実行する
 
 ## ステップ 8: レビューループ
 
-`.claude/issue-loop.local.md` から `max_review_iterations` を読む。
+`.issue-loop.local.md` から `max_review_iterations` を読む。
 
 最大 `max_review_iterations` 回、以下を繰り返す:
 
 a. Skill ツールを使用して `issue-loop:review` スキルを実行する
 
-b. `.claude/issue-loop/review-result.md` を読む:
+b. `.issue-loop/review-result.md` を読む:
    - `status: pass` → ループを抜ける
    - `status: fail` かつ上限未到達 → `review-result.md` のスコープ内指摘を参照しながら、ステップ 7 と同じ種類のスキル（implement または debug）を再実行する
    - 上限到達 → ループを抜ける
@@ -130,7 +130,7 @@ Skill ツールを使用して `issue-loop:push-and-pr` スキルを実行する
 
 **5. 状態ファイル作成**
 
-Write ツールで `.claude/issue-loop.local.md` を以下の内容で作成する（`MAX_ITERATIONS` と `MAX_REVIEW_ITERATIONS` には解釈した値を入れる）:
+Write ツールで `.issue-loop.local.md` を以下の内容で作成する（`MAX_ITERATIONS` と `MAX_REVIEW_ITERATIONS` には解釈した値を入れる）:
 
 ```
 ---
@@ -141,7 +141,7 @@ session_id:
 status: active
 ---
 
-`.claude/issue-loop/iteration-prompt.md` を読み、指示に従って1イテレーションを実行せよ。
+`.issue-loop/iteration-prompt.md` を読み、指示に従って1イテレーションを実行せよ。
 ```
 
 **6. 開始メッセージ表示**
@@ -159,4 +159,4 @@ status: active
 
 **7. 最初のイテレーション開始**
 
-`.claude/issue-loop/iteration-prompt.md` を Read ツールで読み、指示に従って1イテレーションを実行する。
+`.issue-loop/iteration-prompt.md` を Read ツールで読み、指示に従って1イテレーションを実行する。

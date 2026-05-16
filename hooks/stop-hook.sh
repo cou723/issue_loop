@@ -7,7 +7,7 @@ set -euo pipefail
 
 HOOK_INPUT=$(cat)
 
-STATE_FILE=".claude/issue-loop.local.md"
+STATE_FILE=".issue-loop.local.md"
 
 if [[ ! -f "$STATE_FILE" ]]; then
   exit 0

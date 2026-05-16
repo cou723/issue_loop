@@ -23,30 +23,23 @@ Claude Code をはじめとするコーディングエージェントで動く�
 
 ## ループのフロー（1イテレーション）
 
-```
-/pr-sync
-  ↓  pr-snapshot.md を更新、pr-context.md に差分を書き出す
-/pickIssue
-  ↓  current-issue.md に書き出す
-/infoGathering
-  ↓  current-issue.md を更新する
-/pattern
-  ↓  current-issue.md にタイプを追記、next-action.md に implement/debug を書き出す
-git checkout -b <branch>  ← /issueloop が直接実行
-  ↓
-/implement or /debug  ← next-action.md の内容で分岐
-  ↓
-┌─ /review → review-result.md に結果と推奨アクションを書き出す
-│   ↓ 指摘あり？
-│   ├─ Yes（max_review_iterations 未満）
-│   │    → /implement or /debug（review-result.md を参照して修正）
-│   │    → /review（再レビュー）→ 上に戻る
-│   └─ No / 上限到達 → ループ脱出
-└─────────────────────────────────────────
-  ↓
-/issue-update  ← out-of-scope.md を読んで Issue を登録
-  ↓
-/push-and-pr
+```mermaid
+flowchart TD
+    A[pr-sync] --> B[pickIssue]
+    B --> C{Issue あり?}
+    C -- なし --> Z[ループ終了]
+    C -- あり --> D[infoGathering]
+    D --> E[pattern]
+    E --> F["git checkout -b &lt;branch&gt;"]
+    F --> G{next-action}
+    G -- implement --> H[implement]
+    G -- debug --> I[debug]
+    H --> J[review]
+    I --> J
+    J --> K{スコープ内指摘あり?}
+    K -- "Yes / 上限未満" --> G
+    K -- "No / 上限到達" --> L[issue-update]
+    L --> M[push-and-pr]
 ```
 
 外側のループは Stop hook が制御する。Issue が残っていれば次のイテレーションを開始し、残っていなければ終了する。
@@ -56,7 +49,7 @@ git checkout -b <branch>  ← /issueloop が直接実行
 ralph-loop プラグインと同じパターンを採用する。
 
 - `hooks/hooks.json` で Stop hook を定義し、`hooks/stop-hook.sh` がループの継続・終了を制御する
-- ループ状態は `.claude/issue-loop.local.md` に YAML frontmatter 形式で保持する
+- ループ状態は `.issue-loop.local.md` に YAML frontmatter 形式で保持する
 
 ```yaml
 ---
@@ -68,7 +61,7 @@ session_id: <session_id>
 ```
 
 Stop hook の動作：
-1. `.claude/issue-loop.local.md` が存在しなければ終了（ループが開始されていない or キャンセル済み）
+1. `.issue-loop.local.md` が存在しなければ終了（ループが開始されていない or キャンセル済み）
 2. `max_iterations` 超過で終了
 3. 続行する場合は `{ "decision": "block", "reason": "<次回ループのプロンプト>" }` を出力
 
@@ -81,7 +74,7 @@ Stop hook の動作：
 
 ## エージェント間インターフェース
 
-各エージェントはファイルを介してデータを受け渡すことでコンテキストを節約する。ファイルはすべて `.claude/issue-loop/` 以下に置く。
+各エージェントはファイルを介してデータを受け渡すことでコンテキストを節約する。ファイルはすべて `.issue-loop/` 以下に置く。
 
 | ファイル | 書き込み | 読み込み | 用途 |
 |---|---|---|---|
@@ -205,7 +198,7 @@ next-action: implement | debug
 | `/pr-sync` | `Bash(gh pr list:*)`, `Bash(gh pr view:*)`, `Bash(gh issue create:*)`, `Bash(gh pr comment:*)`, `Read`, `Write` |
 | `/pickIssue` | `Bash(gh issue list:*)`, `Bash(gh issue view:*)`, `Bash(gh pr list:*)`, `Read`, `Write` |
 | `/infoGathering` | `Bash(gh issue comment:*)`, `Bash(gh issue view:*)`, `Read`, `Write`, `Task` |
-| `/pattern` | `Read(.claude/issue-loop/current-issue.md)`, `Write(.claude/issue-loop/next-action.md)` |
-| `/review` | `Bash(git diff:*)`, `Read`, `Glob`, `Grep`, `Task`, `Write(.claude/issue-loop/review-result.md)` |
-| `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Task`, `Write(.claude/issue-loop/out-of-scope.md)` |
+| `/pattern` | `Read(.issue-loop/current-issue.md)`, `Write(.issue-loop/next-action.md)` |
+| `/review` | `Bash(git diff:*)`, `Read`, `Glob`, `Grep`, `Task`, `Write(.issue-loop/review-result.md)` |
+| `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Task`, `Write(.issue-loop/out-of-scope.md)` |
 | `/issue-update` | `Bash(gh issue create:*)`, `Bash(gh issue list:*)`, `Bash(gh issue view:*)`, `Read` |

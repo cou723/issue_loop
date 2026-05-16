@@ -1,11 +1,11 @@
 ---
 description: "複数の専門エージェントを並列実行して変更内容をレビューし、結果を review-result.md に書き出す"
-allowed-tools: ["Bash(git diff:*)", "Read", "Glob", "Grep", "Task", "Agent", "Write(.claude/issue-loop/review-result.md)", "Write(.claude/issue-loop/out-of-scope.md)"]
+allowed-tools: ["Bash(git diff:*)", "Read", "Glob", "Grep", "Task", "Agent", "Write(.issue-loop/review-result.md)", "Write(.issue-loop/out-of-scope.md)"]
 ---
 
 # Review
 
-変更内容に対して以下の7つのレビューエージェントを Agent ツールで**並列**起動し、結果を集約して `.claude/issue-loop/review-result.md` に書き出せ。
+変更内容に対して以下の7つのレビューエージェントを Agent ツールで**並列**起動し、結果を集約して `.issue-loop/review-result.md` に書き出せ。
 
 ## レビューエージェント（並列実行）
 
@@ -34,7 +34,7 @@ allowed-tools: ["Bash(git diff:*)", "Read", "Glob", "Grep", "Task", "Agent", "Wr
 
 ## 結果集約
 
-全エージェントの結果を集約して `.claude/issue-loop/review-result.md` を書き出す:
+全エージェントの結果を集約して `.issue-loop/review-result.md` を書き出す:
 
 ```
 ---
@@ -49,5 +49,5 @@ next-action: implement | debug
 ```
 
 判定: スコープ内の指摘が1件以上 → `status: fail`、0件 → `status: pass`
-`next-action` は `.claude/issue-loop/next-action.md` の値を引き継ぐ。
-スコープ外の指摘は `.claude/issue-loop/out-of-scope.md` にも追記する。
+`next-action` は `.issue-loop/next-action.md` の値を引き継ぐ。
+スコープ外の指摘は `.issue-loop/out-of-scope.md` にも追記する。

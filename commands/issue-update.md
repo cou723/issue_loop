@@ -5,11 +5,11 @@ allowed-tools: ["Bash(gh issue create *)", "Bash(gh issue list *)", "Bash(gh iss
 
 # Issue Update
 
-`.claude/issue-loop/out-of-scope.md` を読み、スコープ外として記録された問題を GitHub Issue として登録せよ。
+`.issue-loop/out-of-scope.md` を読み、スコープ外として記録された問題を GitHub Issue として登録せよ。
 
 ## 手順
 
-1. `.claude/issue-loop/out-of-scope.md` が存在しない、または空の場合は終了
+1. `.issue-loop/out-of-scope.md` が存在しない、または空の場合は終了
 2. `gh issue list --state open --limit 100 --json number,title,body` で既存Issue一覧を取得
 3. out-of-scope.md の各項目を統合する
    - 根本原因や対処方針が同一とみなせる項目はひとつにまとめる

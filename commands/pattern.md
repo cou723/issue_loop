@@ -1,11 +1,11 @@
 ---
 description: "Issue のタイプを Feature / Debug / Refactor / Test に分類し、next-action.md に書き出す"
-allowed-tools: ["Read(.claude/issue-loop/current-issue.md)", "Write(.claude/issue-loop/current-issue.md)", "Write(.claude/issue-loop/next-action.md)"]
+allowed-tools: ["Read(.issue-loop/current-issue.md)", "Write(.issue-loop/current-issue.md)", "Write(.issue-loop/next-action.md)"]
 ---
 
 # Pattern
 
-`.claude/issue-loop/current-issue.md` を読み、Issue のタイプを分類せよ。
+`.issue-loop/current-issue.md` を読み、Issue のタイプを分類せよ。
 
 ## 分類基準
 
@@ -16,7 +16,7 @@ allowed-tools: ["Read(.claude/issue-loop/current-issue.md)", "Write(.claude/issu
 
 ## 出力
 
-1. `.claude/issue-loop/current-issue.md` のフロントマターの `type:` を分類結果に更新する
-2. `.claude/issue-loop/next-action.md` に以下を書き出す:
+1. `.issue-loop/current-issue.md` のフロントマターの `type:` を分類結果に更新する
+2. `.issue-loop/next-action.md` に以下を書き出す:
    - `Debug` タイプ → `debug`
    - それ以外（Feature / Refactor / Test） → `implement`

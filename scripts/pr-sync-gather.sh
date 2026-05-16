@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-SNAPSHOT_FILE=".claude/issue-loop/pr-snapshot.json"
+SNAPSHOT_FILE=".issue-loop/pr-snapshot.json"
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 if [[ -f "$SNAPSHOT_FILE" ]]; then

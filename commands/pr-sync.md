@@ -30,7 +30,7 @@ allowed-tools: ["Bash(bash scripts/pr-sync-gather.sh)", "Bash(gh pr view *)", "B
 
 ## ステップ 3: pr-context.md 書き出し
 
-`.claude/issue-loop/pr-context.md` を以下の形式で書き出す。
+`.issue-loop/pr-context.md` を以下の形式で書き出す。
 
 差分がなければ各セクションに「なし」と書く。
 

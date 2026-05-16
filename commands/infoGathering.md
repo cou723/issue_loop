@@ -5,7 +5,7 @@ allowed-tools: ["Bash(gh issue comment *)", "Bash(gh issue view *)", "Read", "Wr
 
 # Info Gathering
 
-`.claude/issue-loop/current-issue.md` を読み、Issue の実装に必要な情報が揃っているか確認せよ。
+`.issue-loop/current-issue.md` を読み、Issue の実装に必要な情報が揃っているか確認せよ。
 
 ## 確認すべき観点
 
@@ -20,6 +20,6 @@ allowed-tools: ["Bash(gh issue comment *)", "Bash(gh issue view *)", "Read", "Wr
 1. 上記観点でIssueの情報を評価する
 2. 不足情報がある場合は `AskUserQuestion` ツールで同期的にユーザーへ質問する
 3. 得られた回答を `gh issue comment <number> --body "<内容>"` でIssueにコメントとして追記する
-4. `.claude/issue-loop/current-issue.md` の本文末尾に収集情報を追記する
+4. `.issue-loop/current-issue.md` の本文末尾に収集情報を追記する
 
 情報が十分揃っている場合は質問せずそのまま終了する。
