@@ -28,7 +28,7 @@ type: ""
 ---
 ```
 
-Issue が**見つかった**場合、`.claude/issue-loop/current-issue.md` に以下を書く:
+Issue が**見つかった**場合、`gh issue view <番号> --json body,comments` でIssue本文とコメント一覧を取得し、`.claude/issue-loop/current-issue.md` に以下を書く:
 
 ```
 ---
@@ -37,5 +37,9 @@ title: "<タイトル>"
 type: ""
 ---
 
-<gh issue view <番号> --json body で取得したIssueの本文>
+<Issueの本文>
+
+## コメント
+
+<各コメントを「**@<author>**: <body>」の形式で列挙。コメントがない場合はこのセクションごと省略>
 ```
