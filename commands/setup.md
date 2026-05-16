@@ -29,6 +29,8 @@ allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop
 .issue-loop*
 ```
 
+追記した場合は、Skill ツールを使用して `commit-commands:commit` スキルを実行し、`.gitignore` の変更をコミットする。
+
 ## ステップ 3: ディレクトリ作成
 
 `mkdir -p .issue-loop` を実行する。
