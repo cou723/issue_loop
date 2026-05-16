@@ -1,13 +1,13 @@
 ---
 description: "前回チェック時点との差分を検出し、マージ済みPRと新規コメント付きPRを把握する。新規コメントからIssueを自動作成し、pr-context.md に書き出す"
-allowed-tools: ["Bash(bash scripts/pr-sync-gather.sh)", "Bash(gh pr view *)", "Bash(gh issue create *)", "Bash(gh pr comment *)", "Write"]
+allowed-tools: ["Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-sync-gather.sh)", "Bash(gh pr view *)", "Bash(gh issue create *)", "Bash(gh pr comment *)", "Write"]
 ---
 
 # PR Sync
 
 ## ステップ 1: 差分収集
 
-`bash scripts/pr-sync-gather.sh` を実行する。
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr-sync-gather.sh"` を実行する。
 
 出力はJSON形式で、以下の構造を持つ:
 - `merged_prs`: 前回チェック以降にマージされたPRのリスト `[{number, title}]`
