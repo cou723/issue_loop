@@ -1,7 +1,7 @@
 ---
 name: type-safety-reviewer
 description: Use this agent to review TypeScript code changes for type safety violations. Checks for unjustified type assertions (as), any usage, ts-ignore/ts-expect-error suppressions, and lint suppression comments. Invoke when reviewing PRs or after implementing TypeScript features.
-tools: Glob, Grep, LS, Read, BashOutput
+tools: Glob, Grep, Read, Bash(git diff *)
 model: inherit
 color: blue
 ---

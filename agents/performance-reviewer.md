@@ -1,7 +1,7 @@
 ---
 name: performance-reviewer
 description: Use this agent to review code changes for performance issues such as N+1 queries, unnecessary loops, redundant computations, and memory inefficiencies. Invoke when reviewing PRs that add data fetching, loops over collections, or rendering-heavy UI changes.
-tools: Glob, Grep, LS, Read, BashOutput
+tools: Glob, Grep, Read, Bash(git diff *)
 model: inherit
 color: green
 ---

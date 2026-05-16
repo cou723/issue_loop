@@ -60,38 +60,3 @@ Stop hook を `~/.claude/settings.json` の `hooks` セクションに追加す�
 /issue-loop:cancel
 ```
 
-## dontask モードの設定
-
-確認プロンプトなしで自動実行するには、対象プロジェクトの `.claude/settings.json` に以下を追加する:
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Read",
-      "Write",
-      "Edit",
-      "Glob",
-      "Grep",
-      "Agent",
-      "Task",
-      "Skill",
-      "Bash(git *)",
-      "Bash(gh issue *)",
-      "Bash(gh pr *)",
-      "Bash(gh repo *)",
-      "Bash(bash scripts/pr-sync-gather.sh)",
-      "Bash(bash hooks/stop-hook.sh)",
-      "Bash(mkdir -p *)",
-      "Bash(test -f *)",
-      "Bash(echo *)",
-      "Bash(curl *)",
-      "mcp__plugin_playwright_playwright__browser_navigate",
-      "mcp__plugin_playwright_playwright__browser_take_screenshot",
-      "mcp__plugin_playwright_playwright__browser_close"
-    ]
-  }
-}
-```
-
-実装・デバッグフェーズでは任意の Bash コマンドが実行される。完全に無制限にする場合は Bash 関連の項目をすべて `"Bash(*)"` 1行に置き換える。

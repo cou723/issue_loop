@@ -1,6 +1,6 @@
 ---
 description: "現在の変更をコミット・プッシュして PR を作成する"
-allowed-tools: ["Skill(commit-commands:commit-push-pr)", "Bash(git add *)", "Bash(git status *)", "Bash(git diff *)", "Bash(git commit *)", "Bash(git push *)", "Bash(git branch *)", "Bash(git checkout --branch *)", "Bash(gh pr create *)", "Bash(gh pr comment *)", "Bash(gh repo view *)", "Bash(curl *)", "Bash(mkdir -p *)", "Bash(echo *)", "mcp__plugin_playwright_playwright__browser_navigate", "mcp__plugin_playwright_playwright__browser_take_screenshot", "mcp__plugin_playwright_playwright__browser_close"]
+allowed-tools: ["Skill(commit-commands:commit-push-pr)", "Bash(git add *)", "Bash(git diff *)", "Bash(git commit *)", "Bash(git branch *)", "Bash(gh pr comment *)", "Bash(gh repo view *)", "Bash(curl *)", "Bash(mkdir -p *)", "Bash(echo *)", "Bash(base64 *)", "mcp__plugin_playwright_playwright__browser_navigate", "mcp__plugin_playwright_playwright__browser_take_screenshot", "mcp__plugin_playwright_playwright__browser_close"]
 ---
 
 # Push and PR

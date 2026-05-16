@@ -1,7 +1,7 @@
 ---
 name: security-reviewer
 description: Use this agent to review code changes for security vulnerabilities based on OWASP Top 10 and common attack vectors. Checks for injection flaws, authentication issues, sensitive data exposure, and other security risks. Invoke when reviewing PRs that touch user input handling, authentication, authorization, or data persistence.
-tools: Glob, Grep, LS, Read, BashOutput
+tools: Glob, Grep, Read, Bash(git diff *)
 model: inherit
 color: red
 ---

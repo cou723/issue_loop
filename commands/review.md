@@ -1,6 +1,6 @@
 ---
 description: "複数の専門エージェントを並列実行して変更内容をレビューし、結果を review-result.md に書き出す"
-allowed-tools: ["Bash(git diff:*)", "Read", "Glob", "Grep", "Task", "Agent", "Write(.issue-loop/review-result.md)", "Write(.issue-loop/out-of-scope.md)"]
+allowed-tools: ["Bash(git diff:*)", "Read", "Glob", "Grep", "Agent", "Write(.issue-loop/review-result.md)", "Write(.issue-loop/out-of-scope.md)"]
 ---
 
 # Review
