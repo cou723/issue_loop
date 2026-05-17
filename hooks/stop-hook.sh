@@ -72,14 +72,30 @@ if [[ -z "$PROMPT_TEXT" ]]; then
 fi
 
 DONE_FLAG=".issue-loop/iteration-done"
+RETRY_COUNT_FILE=".issue-loop/retry-count"
+MAX_RETRY=3
+
 if [[ ! -f "$DONE_FLAG" ]]; then
-  jq -n \
-    --arg prompt "$PROMPT_TEXT" \
-    --arg msg "🔁 Issue loop: イテレーション $ITERATION / $(if [[ $MAX_ITERATIONS -gt 0 ]]; then echo $MAX_ITERATIONS; else echo '∞'; fi) を再実行します（未完了のため）" \
-    '{"decision": "block", "reason": $prompt, "systemMessage": $msg}'
-  exit 0
+  RETRY_COUNT=0
+  if [[ -f "$RETRY_COUNT_FILE" ]]; then
+    RETRY_COUNT=$(cat "$RETRY_COUNT_FILE" 2>/dev/null || echo 0)
+  fi
+
+  if [[ $RETRY_COUNT -ge $MAX_RETRY ]]; then
+    rm -f "$RETRY_COUNT_FILE"
+    echo "⚠️ Issue loop: イテレーション $ITERATION が ${MAX_RETRY} 回連続で未完了のため、次のイテレーションへ進みます。" >&2
+    # fall through to next iteration logic
+  else
+    echo $((RETRY_COUNT + 1)) > "$RETRY_COUNT_FILE"
+    jq -n \
+      --arg prompt "$PROMPT_TEXT" \
+      --arg msg "🔁 Issue loop: イテレーション $ITERATION / $(if [[ $MAX_ITERATIONS -gt 0 ]]; then echo $MAX_ITERATIONS; else echo '∞'; fi) を再実行します（未完了のため、試行 $((RETRY_COUNT + 1))/${MAX_RETRY}）" \
+      '{"decision": "block", "reason": $prompt, "systemMessage": $msg}'
+    exit 0
+  fi
 fi
 rm -f "$DONE_FLAG"
+rm -f "$RETRY_COUNT_FILE"
 
 NEXT_ITERATION=$((ITERATION + 1))
 

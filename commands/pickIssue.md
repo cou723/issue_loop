@@ -7,6 +7,8 @@ allowed-tools: ["Bash(gh issue list *)", "Bash(gh issue view *)", "Bash(gh pr li
 
 GitHub からこのリポジトリのオープン Issue を取得し、最優先で取り組むべき Issue を1つ選んで `.issue-loop/current-issue.md` に書き出せ。
 
+**重要**: ユーザーへの質問・確認・選択肢の提示は一切禁止。どんな状況でも自律的に判断して `current-issue.md` を書き出してこのスキルを終了すること。
+
 ## 手順
 
 1. `gh issue list --state open --limit 50 --json number,title,body,labels,milestone` でIssue一覧取得

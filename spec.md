@@ -63,7 +63,8 @@ session_id: <session_id>
 Stop hook の動作：
 1. `.issue-loop.local.md` が存在しなければ終了（ループが開始されていない or キャンセル済み）
 2. `max_iterations` 超過で終了
-3. 続行する場合は `{ "decision": "block", "reason": "<次回ループのプロンプト>" }` を出力
+3. `.issue-loop/iteration-done` が存在しなければ同一イテレーションを再実行（上限3回。超過したら次のイテレーションへ進む）
+4. 続行する場合は `{ "decision": "block", "reason": "<次回ループのプロンプト>" }` を出力
 
 ループ終了条件：
 - 取り組む Issue が0件

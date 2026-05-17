@@ -39,7 +39,12 @@ allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop
 
 `echo "$CLAUDE_PLUGIN_ROOT"` を実行してプラグインのルートパスを取得する（以下 PLUGIN_ROOT と呼ぶ）。
 
-Write ツールで `.issue-loop/pr-sync-gather.sh` を以下の内容で作成する（`<PLUGIN_ROOT>` を取得した実際のパスに置換すること）:
+**重要**: 取得した値が空の場合は即座に以下を表示して終了する:
+```
+❌ CLAUDE_PLUGIN_ROOT が設定されていません。プラグインが正しくインストールされているか確認してください。
+```
+
+Write ツールで `.issue-loop/pr-sync-gather.sh` を作成する。`<PLUGIN_ROOT>` を取得した**実際の絶対パス**に置換すること。**`$CLAUDE_PLUGIN_ROOT` や `${CLAUDE_PLUGIN_ROOT}` のような変数参照をそのまま書いてはいけない**（このスクリプトはClaude Codeの外のシェルで実行されるため、変数が展開されない）:
 
 ```
 #!/bin/bash
