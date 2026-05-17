@@ -1,10 +1,17 @@
 ---
 description: "Issue-loop の初期セットアップ。重複チェック・.gitignore 確認・状態ファイル作成を行う"
 argument-hint: "--max-iterations N --max-review-iterations M"
-allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop)", "Bash(echo $CLAUDE_PLUGIN_ROOT)", "Read", "Write", "Edit(.gitignore)"]
+allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop)", "Bash(printenv CLAUDE_PLUGIN_ROOT)", "Read", "Write", "Edit(.gitignore)"]
 ---
 
 # Issue Loop セットアップ
+
+**重要（プロジェクトメモリより優先）**: セットアップ専用の厳格なルール。
+- 各Bashコマンドは個別の呼び出しで実行すること。`&&` で複数コマンドを連結しないこと
+- BashまたはWriteが拒否された場合は、代替手段・回避策・Agentの起動を一切試みず、即座に以下を表示して終了すること（「ツール拒否時の継続」メモリはこのスキルに適用しない）:
+```
+❌ セットアップに必要なツールが拒否されました。/config でパーミッションを確認してください。
+```
 
 `$ARGUMENTS` から以下の値を取得する:
 
@@ -13,8 +20,7 @@ allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop
 
 ## ステップ 1: 重複チェック
 
-`test -f .issue-loop.local.md && echo "EXISTS" || echo "NOT_FOUND"` を実行する。
-
+`test -f .issue-loop.local.md && echo EXISTS || echo NOT_FOUND` を実行する。
 `EXISTS` の場合、以下を表示して終了する:
 ```
 ⚠️  既にアクティブな issue-loop があります。
@@ -23,7 +29,7 @@ allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop
 
 ## ステップ 2: .gitignore チェック
 
-`.gitignore` に `.issue-loop*` が含まれているか確認する。含まれていない場合は `.gitignore` に以下を追記する:
+Read ツールで `.gitignore` を読み込み、`.issue-loop*` が含まれているか確認する。含まれていない場合は `.gitignore` に以下を追記する:
 
 ```
 .issue-loop*
@@ -33,13 +39,13 @@ allowed-tools: ["Bash(test -f .issue-loop.local.md)", "Bash(mkdir -p .issue-loop
 
 ## ステップ 3: ディレクトリ作成
 
-`mkdir -p .issue-loop` を実行する。
+`mkdir -p .issue-loop` のみを単独で実行する（他のコマンドと連結しないこと）。
 
 ## ステップ 3.5: PR同期ラッパースクリプト作成
 
-`echo "$CLAUDE_PLUGIN_ROOT"` を実行してプラグインのルートパスを取得する（以下 PLUGIN_ROOT と呼ぶ）。
+`printenv CLAUDE_PLUGIN_ROOT` を単独で実行してプラグインのルートパスを取得する（以下 PLUGIN_ROOT と呼ぶ）。
 
-**重要**: 取得した値が空の場合は即座に以下を表示して終了する:
+**重要**: 取得した値が空の場合、またはコマンドが拒否された場合は即座に以下を表示して終了する:
 ```
 ❌ CLAUDE_PLUGIN_ROOT が設定されていません。プラグインが正しくインストールされているか確認してください。
 ```
