@@ -10,8 +10,6 @@ GitHub Issue ベースの自動開発ループを実現する Claude Code プラ
 
 ## セットアップ
 
-### ローカル開発
-
 各スキルを `~/.claude/skills/` にシンボリックリンクする:
 
 ```bash
@@ -20,25 +18,6 @@ for f in commands/*.md; do
   skill=$(basename "$f" .md)
   ln -s "$PLUGIN_DIR/$f" ~/.claude/skills/issue-loop:${skill}.md
 done
-```
-
-Stop hook を `~/.claude/settings.json` の `hooks` セクションに追加する:
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"/absolute/path/to/issue-loop/hooks/stop-hook.sh\""
-          }
-        ]
-      }
-    ]
-  }
-}
 ```
 
 ## 使い方
@@ -60,3 +39,29 @@ Stop hook を `~/.claude/settings.json` の `hooks` セクションに追加す�
 /issue-loop:cancel
 ```
 
+### パーミッション設定
+
+プラグインの実行には **`acceptEdits` モード**（または同等の権限設定）が必要です。
+
+対象プロジェクトの `.claude/settings.local.json` に以下を追加してください:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash *pr-sync-gather.sh*)",
+      "Bash(test -f .issue-loop/cancel-requested)",
+      "Bash(rm .issue-loop/cancel-requested)",
+      "Bash(rm -f .issue-loop/out-of-scope.md)",
+      "Bash(git checkout -b *)",
+      "Bash(gh issue list *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue comment *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr comment *)"
+    ]
+  }
+}
+```

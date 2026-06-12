@@ -1,11 +1,10 @@
 ---
-description: "Issue のタイプを Feature / Debug / Refactor / Test に分類し、next-action.md に書き出す"
-allowed-tools: ["Read(.issue-loop/current-issue.md)", "Write(.issue-loop/current-issue.md)", "Write(.issue-loop/next-action.md)"]
+name: pattern
+description: IssueのタイプをFeature/Debug/Refactor/Testに分類し、current-issue.mdを更新してnext-action.mdに書き出す。issue-loopで情報収集の後に呼ばれる。
+tools: Read, Write
 ---
 
-# Pattern
-
-`.issue-loop/current-issue.md` を読み、Issue のタイプを分類せよ。
+あなたは Issue 分類エージェントです。`.issue-loop/current-issue.md` を読み、Issue のタイプを分類して結果を書き出します。
 
 ## 分類基準
 

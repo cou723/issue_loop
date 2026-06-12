@@ -6,20 +6,20 @@ Claude Code をはじめとするコーディングエージェントで動く�
 
 ### Skills（Claudeへの命令スキル）
 
-- **`/issueloop`**：ループを開始・初期化する。Stop hook と組み合わせてループを制御する
+- **`/issueloop`**：ループのオーケストレーター。セットアップ・ループ制御・各サブエージェントの呼び出しをすべて担う
 - **`/push-and-pr`**：コミット・プッシュ・PR作成を一括実行する（`commit-commands:commit-push-pr` を流用）
 - **`/cancel`**：実行中のループを中断する
 
 ### Agents（コンテキストを分離して実行するサブエージェント）
 
-- **`/pr-sync`**：前回チェック時点との差分を取得し、マージ済みPRと新規コメントが付いたPRを検出する。新規コメント付きPRからは Issue を自動作成し、重複防止のためPRにコメントで記録する。結果を `pr-context.md` に書き出す
-- **`/pickIssue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報を考慮して判断する
-- **`/infoGathering`**：Issue の不足情報を `AskUserQuestion` で同期的にユーザーへ質問し、回答をコメントとして Issue に追記する
-- **`/pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
-- **`/implement`**：実装を行う。`feature-dev:feature-dev` スキルに委譲し、完了後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
-- **`/debug`**：デバッグを行う。`feature-dev:code-explorer` エージェントを内部で活用する独自実装。最後にスコープ外の発見事項を書き出す
-- **`/review`**：複数の専門エージェントを並列実行して変更内容をレビューする。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
-- **`/issue-update`**：`/implement` や `/debug` が書き出したスコープ外の発見事項を統合・整理したうえで既存 Issue と照合し、重複のない新規 Issue を登録する
+- **`pr-sync`**：前回チェック時点との差分を取得し、マージ済みPRと新規コメントが付いたPRを検出する。新規コメント付きPRからは Issue を自動作成し、重複防止のためPRにコメントで記録する。結果を `pr-context.md` に書き出す
+- **`pick-issue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報を考慮して判断する
+- **`info-gathering`**：Issue の不足情報を `AskUserQuestion` で同期的にユーザーへ質問し、回答をコメントとして Issue に追記する
+- **`pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
+- **`implement`**：実装を行う。`feature-dev:code-explorer` で調査し、実装後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
+- **`debug`**：デバッグを行う。`feature-dev:code-explorer` で根本原因を特定し、修正を実装する。最後にスコープ外の発見事項を書き出す
+- **`review`**：7つの専門エージェントを並列実行して変更内容をレビューする。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
+- **`issue-update`**：`implement` や `debug` が書き出したスコープ外の発見事項を統合・整理したうえで既存 Issue と照合し、重複のない新規 Issue を登録する
 
 ## ループのフロー（1イテレーション）
 
@@ -42,34 +42,16 @@ flowchart TD
     L --> M[push-and-pr]
 ```
 
-外側のループは Stop hook が制御する。Issue が残っていれば次のイテレーションを開始し、残っていなければ終了する。
+外側のループは `/issueloop` スキル自身が制御する。
 
 ## ループ機構
 
-ralph-loop プラグインと同じパターンを採用する。
-
-- `hooks/hooks.json` で Stop hook を定義し、`hooks/stop-hook.sh` がループの継続・終了を制御する
-- ループ状態は `.issue-loop.local.md` に YAML frontmatter 形式で保持する
-
-```yaml
----
-iteration: 1
-max_iterations: 20
-max_review_iterations: 3
-session_id: <session_id>
----
-```
-
-Stop hook の動作：
-1. `.issue-loop.local.md` が存在しなければ終了（ループが開始されていない or キャンセル済み）
-2. `max_iterations` 超過で終了
-3. `.issue-loop/iteration-done` が存在しなければ同一イテレーションを再実行（上限3回。超過したら次のイテレーションへ進む）
-4. 続行する場合は `{ "decision": "block", "reason": "<次回ループのプロンプト>" }` を出力
+`/issueloop` スキルがオーケストレーターとして動作し、ループをスキル内のロジックで完結させる。外部 hook には依存しない。
 
 ループ終了条件：
 - 取り組む Issue が0件
 - `max_iterations` 超過
-- ユーザーが `/cancel` を実行
+- ユーザーが `/cancel` を実行（`.issue-loop/cancel-requested` フラグを検出）
 
 エラー発生時の挙動：エラーの種類によらず、現在の Issue に「自動化失敗: `<理由>`」をコメントして次の Issue へスキップする。
 
