@@ -12,7 +12,7 @@ tools: Bash, Read, Write
 
 1. `gh issue list --state open --limit 50 --json number,title,body,labels,milestone` で Issue 一覧取得
 2. `gh pr list --state open --json number,title,headRefName` で既存 PR 一覧取得
-3. `.issue-loop/pr-context.md` を読み、マージ済み PR 一覧を把握する
+3. `.issue-loop/pr-context.md` を読み、マージ済み PR 一覧を把握する（ファイルが存在しない場合はマージ済みPRなしとして処理を続行する）
 4. Issue 本文内の "depends on #N"、"blocked by #N" などの依存関係を確認する。依存先が未解決かどうかは `gh issue view #N` でクローズ済みか確認し、クローズ済みまたは pr-context.md のマージ済みリストに含まれていれば解決済みとみなす
 5. 既存 PR が紐づく Issue は除外
 6. マイルストーン優先度・ラベル・番号順（小さい番号優先）で最優先 Issue を1つ選ぶ

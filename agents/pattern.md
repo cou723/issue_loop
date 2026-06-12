@@ -16,6 +16,11 @@ tools: Read, Write
 ## 出力
 
 1. `.issue-loop/current-issue.md` のフロントマターの `type:` を分類結果に更新する
-2. `.issue-loop/next-action.md` に以下を書き出す:
+2. `.issue-loop/next-action.md` に以下を書き出す（1行のみ、改行なし）:
    - `Debug` タイプ → `debug`
    - それ以外（Feature / Refactor / Test） → `implement`
+
+`next-action.md` の内容例（ファイル全体）:
+```
+implement
+```

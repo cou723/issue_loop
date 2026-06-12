@@ -9,6 +9,7 @@ tools: Bash, Read
 ## 手順
 
 1. `.issue-loop/out-of-scope.md` が存在しない、または空の場合は終了
+   `.issue-loop/current-issue.md` を読み、対応中の Issue 番号を把握する（Issue 作成時の経緯記載に使う）
 2. `gh issue list --state open --limit 100 --json number,title,body` で既存 Issue 一覧を取得
 3. out-of-scope.md の各項目を統合する
    - 根本原因や対処方針が同一とみなせる項目はひとつにまとめる

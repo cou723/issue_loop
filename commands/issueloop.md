@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Read", "Write", "Edit(.gitignore)", "Bash(mkdir -p .issue-loop)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
+allowed-tools: ["Read", "Write(.issue-loop/pr-sync-gather.sh)", "Edit(.gitignore)", "Bash(mkdir -p .issue-loop)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
 ---
 
 # Issue Loop
@@ -125,8 +125,8 @@ review_count = 0 とする。
 
 Read ツールで `.issue-loop/next-action.md` を読む。
 
-- `implement` → Agent ツールで `issue-loop:implement` サブエージェントを起動する（prompt: "Issue を実装してください"）
-- `debug` → Agent ツールで `issue-loop:debug` サブエージェントを起動する（prompt: "バグを修正してください"）
+- `implement` → Agent ツールで `issue-loop:implement` サブエージェントを起動する（prompt: "`.issue-loop/current-issue.md` を読み Issue を実装してください。`.issue-loop/review-result.md` が存在する場合は先に読んでレビュー指摘を把握してください。"）
+- `debug` → Agent ツールで `issue-loop:debug` サブエージェントを起動する（prompt: "`.issue-loop/current-issue.md` を読みバグを修正してください。`.issue-loop/review-result.md` が存在する場合は先に読んでレビュー指摘を把握してください。"）
 
 #### b. レビュー
 
@@ -146,7 +146,7 @@ Read ツールで `.issue-loop/review-result.md` を読む。
 ### ステップ 8: Issue更新
 
 Agent ツールで `issue-loop:issue-update` サブエージェントを起動する。
-- prompt: "スコープ外の発見事項を Issue として登録してください"
+- prompt: "`.issue-loop/current-issue.md` で対応中の Issue 番号を確認し、`.issue-loop/out-of-scope.md` のスコープ外の発見事項を Issue として登録してください（発見した経緯として Issue 番号を本文に含めてください）"
 
 ---
 

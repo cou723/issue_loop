@@ -8,6 +8,13 @@ GitHub Issue ベースの自動開発ループを実現する Claude Code プラ
 - [GitHub CLI](https://cli.github.com/)（`gh auth login` 済み）
 - GitHub リポジトリ（Issue が登録済み）
 
+### 必要な外部プラグイン
+
+`review` ステップが以下のプラグインのエージェントを利用します。事前にインストールしてください。
+
+- `pr-review-toolkit`（`comment-analyzer`, `pr-test-analyzer`, `silent-failure-hunter`, `code-simplifier`）
+- `feature-dev`（`code-explorer`, `code-reviewer`）
+
 ## セットアップ
 
 各スキルを `~/.claude/skills/` にシンボリックリンクする:
