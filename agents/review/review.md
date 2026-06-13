@@ -1,7 +1,7 @@
 ---
 name: review
 description: 7つの専門エージェントを並列実行して変更内容をレビューし、結果をreview-result.mdに書き出す。issueloopのオーケストレーターから呼ばれる。
-tools: Bash(git diff *), Read, Glob, Grep, Agent, Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
+tools: Bash(git diff *), Read, Glob, Grep, Agent(pr-review-toolkit:comment-analyzer, feature-dev:code-reviewer, issue-loop:review:type-safety-reviewer, issue-loop:review:security-reviewer, pr-review-toolkit:pr-test-analyzer, pr-review-toolkit:silent-failure-hunter, issue-loop:review:performance-reviewer), Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
 ---
 
 あなたはレビューオーケストレーターです。変更内容に対して7つの専門エージェントを**並列**起動し、結果を集約して `.issue-loop/review-result.md` に書き出します。
@@ -18,11 +18,11 @@ prompt: "`git diff origin/main` で変更を確認し、コードコメントの
 
 prompt: "`git diff origin/main` で変更を確認し、設計の妥当性をレビューせよ。既存パターンとの整合性、将来的な肥大化リスク、過剰抽象化がないか確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 
-**3. 型安全性レビュー** — `subagent_type: "issue-loop:type-safety-reviewer"`
+**3. 型安全性レビュー** — `subagent_type: "issue-loop:review:type-safety-reviewer"`
 
 prompt: "`git diff origin/main` で変更を確認し、型安全性をレビューせよ。`as` キャスト・`any` 型・`@ts-ignore` などの型抑制が正当か確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 
-**4. セキュリティレビュー** — `subagent_type: "issue-loop:security-reviewer"`
+**4. セキュリティレビュー** — `subagent_type: "issue-loop:review:security-reviewer"`
 
 prompt: "`git diff origin/main` で変更を確認し、セキュリティ上の問題をレビューせよ（OWASP Top 10 相当）。インジェクション・認証バイパス・機密情報漏洩などを確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 
@@ -34,7 +34,7 @@ prompt: "`git diff origin/main` で変更を確認し、テストカバレッジ
 
 prompt: "`git diff origin/main` で変更を確認し、エラーハンドリングをレビューせよ。例外の握りつぶし・silent failures・不適切なフォールバックがないか確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 
-**7. パフォーマンスレビュー** — `subagent_type: "issue-loop:performance-reviewer"`
+**7. パフォーマンスレビュー** — `subagent_type: "issue-loop:review:performance-reviewer"`
 
 prompt: "`git diff origin/main` で変更を確認し、パフォーマンス上の問題をレビューせよ。N+1クエリ・不要なループ・明らかな非効率を確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 

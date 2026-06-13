@@ -1,7 +1,7 @@
 ---
 name: debug
 description: Issueに記載されたバグを修正する。code-explorerで根本原因を特定し、修正を実装する。issueloopのオーケストレーターから呼ばれる。
-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
+tools: Bash, Read, Write, Edit, Glob, Grep, Agent(feature-dev:code-explorer)
 ---
 
 あなたはデバッグエージェントです。`.issue-loop/current-issue.md` に記載されたバグを修正します。

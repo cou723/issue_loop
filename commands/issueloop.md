@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
-argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Read", "Bash(bash *setup-issue-loop.sh)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
+argument-hint: "[--max-iterations N] [--max-review-iterations N] [--interactive]"
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(grep * .issue-loop/iteration-signal)", "Agent"]
 ---
 
 # Issue Loop
@@ -12,6 +12,7 @@ allowed-tools: ["Read", "Bash(bash *setup-issue-loop.sh)", "Bash(git checkout -b
 
 - `--max-iterations N` → MAX_ITERATIONS = N（デフォルト: 20）
 - `--max-review-iterations N` → MAX_REVIEW_ITERATIONS = N（デフォルト: 3）
+- `--interactive` → INTERACTIVE = true（デフォルト: false）。情報不足時にユーザーへ質問する
 - `-h` / `--help` → 以下を表示して終了:
 
 ```
@@ -23,11 +24,14 @@ USAGE:
 OPTIONS:
   --max-iterations N          最大イテレーション数（デフォルト: 20）
   --max-review-iterations N   1イテレーション内の最大レビュー回数（デフォルト: 3）
+  --interactive               情報不足時にユーザーへ質問する（デフォルト: 無人実行）
 
 STOPPING:
   /issue-loop:cancel でループを中断できます
   Issue がなくなった時点で自動終了します
 ```
+
+INTERACTIVE が false（デフォルト）の場合、ループは完全に無人で動作し、情報不足の Issue でも質問せず利用可能な情報のみで進める。
 
 ## セットアップ
 
@@ -60,92 +64,24 @@ iteration = 1 から始め MAX_ITERATIONS 回を上限に以下を繰り返す�
 
 ---
 
-### ステップ 1: PR同期
+### イテレーション実行
 
-Agent ツールで `issue-loop:pr-sync` サブエージェントを起動する。
-- prompt: "PR 同期を実行してください"
+`rm -f .issue-loop/iteration-signal` を実行し、前イテレーションのシグナルをクリアする（クラッシュ時に古いシグナルを誤読しないため）。
 
----
-
-### ステップ 2: Issue選定
-
-Agent ツールで `issue-loop:pick-issue` サブエージェントを起動する。
-- prompt: "取り組む Issue を選定してください"
+Agent ツールで `issue-loop:iteration` サブエージェントを起動する。
+- prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, INTERACTIVE = <INTERACTIVE>"
 
 ---
 
-### ステップ 3: Issue確認
+### シグナル確認
 
-Read ツールで `.issue-loop/current-issue.md` を読む。
+`grep -s "" .issue-loop/iteration-signal` を実行してシグナルを確認する。
 
-フロントマターに `title: "NO_ISSUE"` が含まれる場合:
-- 「✅ 取り組む Issue がなくなりました。ループを終了します。」と表示する
-- ループを終了する
-
----
-
-### ステップ 4: 情報収集
-
-Agent ツールで `issue-loop:info-gathering` サブエージェントを起動する。
-- prompt: "Issue の不足情報を収集してください"
-
----
-
-### ステップ 5: Issue分類
-
-Agent ツールで `issue-loop:pattern` サブエージェントを起動する。
-- prompt: "Issue のタイプを分類してください"
-
----
-
-### ステップ 6: ブランチ作成
-
-Read ツールで `.issue-loop/current-issue.md` を読み、Issue 番号とタイトルを取得する。ブランチ名を `issue-<番号>-<kebab-case-slug>` 形式で決定する（タイトルから英数字・ハイフンのみ使用、スペースはハイフンに変換）。
-
-`git checkout -b <ブランチ名>` を実行する。
-
-`rm -f .issue-loop/out-of-scope.md` を実行して前イテレーションの残骸をクリアする。
-
----
-
-### ステップ 7: 実装・レビューループ
-
-review_count = 0 とする。
-
-以下を繰り返す（上限: MAX_REVIEW_ITERATIONS）:
-
-#### a. 実装またはデバッグ
-
-Read ツールで `.issue-loop/next-action.md` を読む。
-
-- `implement` → Agent ツールで `issue-loop:implement` サブエージェントを起動する（prompt: "`.issue-loop/current-issue.md` を読み Issue を実装してください。`.issue-loop/review-result.md` が存在する場合は先に読んでレビュー指摘を把握してください。"）
-- `debug` → Agent ツールで `issue-loop:debug` サブエージェントを起動する（prompt: "`.issue-loop/current-issue.md` を読みバグを修正してください。`.issue-loop/review-result.md` が存在する場合は先に読んでレビュー指摘を把握してください。"）
-
-#### b. レビュー
-
-Agent ツールで `issue-loop:review` サブエージェントを起動する。
-- prompt: "変更内容をレビューしてください"
-
-#### c. 結果確認
-
-Read ツールで `.issue-loop/review-result.md` を読む。
-
-- `status: pass` → 「✅ レビュー通過」と表示してループを脱出する
-- `status: fail` かつ review_count + 1 < MAX_REVIEW_ITERATIONS → 「🔁 レビュー指摘あり、修正して再レビューします（<review_count+1> / <MAX_REVIEW_ITERATIONS>）」と表示して review_count++ して **a** に戻る
-- 上限到達 → 「⚠️ レビュー上限に達しました。PR作成に進みます。」と表示してループを脱出する
-
----
-
-### ステップ 8: Issue更新
-
-Agent ツールで `issue-loop:issue-update` サブエージェントを起動する。
-- prompt: "`.issue-loop/current-issue.md` で対応中の Issue 番号を確認し、`.issue-loop/out-of-scope.md` のスコープ外の発見事項を Issue として登録してください（発見した経緯として Issue 番号を本文に含めてください）"
-
----
-
-### ステップ 9: PR作成
-
-Skill ツールで `issue-loop:push-and-pr` スキルを実行する。
+- `NO_ISSUE` → 「✅ 取り組む Issue がなくなりました。ループを終了します。」と表示してループを終了する
+- `CANCELLED` → 「🛑 キャンセルリクエストを受け付けました。」と表示してループを終了する
+- `FAILED` → 「❌ イテレーション <iteration> が失敗しました。安全のためループを終了します。`.issue-loop/` の状態を確認してください。」と表示してループを終了する
+- **シグナルが空または存在しない**（出力が空）→ サブエージェントが結果を残さず終了した（異常終了の可能性）。「⚠️ イテレーション <iteration> が結果を残さず終了しました（異常終了の可能性）。安全のためループを終了します。」と表示してループを終了する
+- `DONE` → 正常完了。次へ進む
 
 ---
 

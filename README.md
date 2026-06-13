@@ -39,6 +39,7 @@ done
 |---|---|---|
 | `--max-iterations N` | 最大イテレーション数 | 20 |
 | `--max-review-iterations N` | 1イテレーション内の最大レビュー回数 | 3 |
+| `--interactive` | 情報不足時にユーザーへ質問する（無指定時は完全無人で実行） | 無効 |
 
 ループを中断するには:
 
@@ -60,7 +61,12 @@ done
       "Bash(test -f .issue-loop/cancel-requested)",
       "Bash(rm .issue-loop/cancel-requested)",
       "Bash(rm -f .issue-loop/out-of-scope.md)",
+      "Bash(rm -f .issue-loop/review-result.md)",
+      "Bash(rm -f .issue-loop/iteration-signal)",
       "Bash(git checkout -b *)",
+      "Bash(git checkout main)",
+      "Bash(git pull *)",
+      "Bash(git branch *)",
       "Bash(gh issue list *)",
       "Bash(gh issue view *)",
       "Bash(gh issue create *)",

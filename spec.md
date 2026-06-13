@@ -12,9 +12,10 @@ Claude Code をはじめとするコーディングエージェントで動く�
 
 ### Agents（コンテキストを分離して実行するサブエージェント）
 
+- **`iteration`**：1イテレーション（PR同期→Issue選定→実装→レビュー→PR作成）全体を担うオーケストレーター。各サブエージェントをネストして呼び出し、終了時に `iteration-signal` へ結果を書き出す
 - **`pr-sync`**：前回チェック時点との差分を取得し、マージ済みPRと新規コメントが付いたPRを検出する。新規コメント付きPRからは Issue を自動作成し、重複防止のためPRにコメントで記録する。結果を `pr-context.md` に書き出す
 - **`pick-issue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報を考慮して判断する
-- **`info-gathering`**：Issue の不足情報を `AskUserQuestion` で同期的にユーザーへ質問し、回答をコメントとして Issue に追記する
+- **`info-gathering`**：Issue の不足情報を確認する。`--interactive` 指定時のみ `AskUserQuestion` でユーザーへ質問し回答を Issue に追記する。無人実行時（デフォルト）は質問せず、不足観点を `current-issue.md` に追記して進める
 - **`pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
 - **`implement`**：実装を行う。`feature-dev:code-explorer` で調査し、実装後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
 - **`debug`**：デバッグを行う。`feature-dev:code-explorer` で根本原因を特定し、修正を実装する。最後にスコープ外の発見事項を書き出す
@@ -30,7 +31,7 @@ flowchart TD
     C -- なし --> Z[ループ終了]
     C -- あり --> D[infoGathering]
     D --> E[pattern]
-    E --> F["git checkout -b &lt;branch&gt;"]
+    E --> F["git checkout main → git checkout -b &lt;branch&gt;"]
     F --> G{next-action}
     G -- implement --> H[implement]
     G -- debug --> I[debug]
@@ -49,11 +50,14 @@ flowchart TD
 `/issueloop` スキルがオーケストレーターとして動作し、ループをスキル内のロジックで完結させる。外部 hook には依存しない。
 
 ループ終了条件：
-- 取り組む Issue が0件
+- 取り組む Issue が0件（`NO_ISSUE` シグナル）
 - `max_iterations` 超過
-- ユーザーが `/cancel` を実行（`.issue-loop/cancel-requested` フラグを検出）
+- ユーザーが `/cancel` を実行（`.issue-loop/cancel-requested` フラグを検出 → `CANCELLED` シグナル）
+- イテレーションが続行不能な失敗で終了（`FAILED` シグナル、またはシグナル未書き込みの異常終了）
 
-エラー発生時の挙動：エラーの種類によらず、現在の Issue に「自動化失敗: `<理由>`」をコメントして次の Issue へスキップする。
+各イテレーションは終了時に `.issue-loop/iteration-signal` へ `DONE` / `NO_ISSUE` / `CANCELLED` / `FAILED` のいずれかを書き出す。オーケストレーターはイテレーション起動前に同ファイルを削除し、起動後に内容を読む。シグナルが空（サブエージェントのクラッシュ等）の場合も異常終了とみなしてループを停止する。
+
+エラー発生時の挙動：必須ファイルの欠落・PR 作成失敗など続行不能な異常は、リトライやデバッグを繰り返さず `FAILED` を書いてループを停止する。同一 Issue を次イテレーションで無限に選び直す事故を防ぐため、PR が実在することを検証してから `DONE` とする。キャンセル要求は各ステップの区切りで検出し、現在のステップ完了後に停止する。
 
 ## エージェント間インターフェース
 
@@ -66,7 +70,9 @@ flowchart TD
 | `current-issue.md` | /pickIssue, /infoGathering, /pattern | /pattern, /implement, /debug | Issue の詳細・収集情報・タイプ |
 | `next-action.md` | /pattern, /review | /issueloop | `implement` または `debug` の判定結果 |
 | `review-result.md` | /review | /implement, /debug, /issueloop | レビュー結果・指摘内容・推奨アクション・合否 |
-| `out-of-scope.md` | /implement, /debug | /issue-update | スコープ外の発見事項リスト |
+| `out-of-scope.md` | /implement, /debug, /review | /issue-update | スコープ外の発見事項リスト |
+| `iteration-signal` | /iteration | /issueloop | イテレーション結果（`DONE`/`NO_ISSUE`/`CANCELLED`/`FAILED`）。起動前にオーケストレーターが削除する |
+| `cancel-requested` | /cancel | /issueloop, /iteration | キャンセル要求フラグ（存在＝要求あり） |
 
 `current-issue.md` の構造：
 ```markdown
