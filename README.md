@@ -57,12 +57,19 @@ done
 {
   "permissions": {
     "allow": [
+      "Bash(bash *setup-issue-loop.sh)",
       "Bash(bash *pr-sync-gather.sh*)",
       "Bash(test -f .issue-loop/cancel-requested)",
-      "Bash(rm .issue-loop/cancel-requested)",
+      "Bash(test -d .issue-loop)",
+      "Bash(touch .issue-loop/cancel-requested)",
+      "Bash(grep * .issue-loop/iteration-signal)",
+      "Bash(rm -f .issue-loop/cancel-requested)",
       "Bash(rm -f .issue-loop/out-of-scope.md)",
       "Bash(rm -f .issue-loop/review-result.md)",
       "Bash(rm -f .issue-loop/iteration-signal)",
+      "Bash(git add *)",
+      "Bash(git diff *)",
+      "Bash(git commit *)",
       "Bash(git checkout -b *)",
       "Bash(git checkout main)",
       "Bash(git pull *)",
@@ -73,7 +80,11 @@ done
       "Bash(gh issue comment *)",
       "Bash(gh pr list *)",
       "Bash(gh pr view *)",
-      "Bash(gh pr comment *)"
+      "Bash(gh pr comment *)",
+      "Bash(gh repo view *)",
+      "Bash(curl *)",
+      "Bash(mkdir -p *)",
+      "Bash(base64 *)"
     ]
   }
 }
