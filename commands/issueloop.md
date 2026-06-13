@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Read", "Edit(.gitignore)", "Bash(mkdir -p .issue-loop)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
+allowed-tools: ["Read", "Bash(bash *setup-issue-loop.sh)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
 ---
 
 # Issue Loop
@@ -31,9 +31,7 @@ STOPPING:
 
 ## セットアップ
 
-1. `mkdir -p .issue-loop` を実行する
-2. Read ツールで `.gitignore` を読み、`.issue-loop*` が含まれていなければ末尾に追記する
-3. `rm -f .issue-loop/cancel-requested` を実行してキャンセルフラグをリセットする
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh"` を実行する。
 
 ## 開始メッセージ
 
