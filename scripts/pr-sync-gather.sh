@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # PR状態の差分を収集してJSONで出力する
 # 出力: {merged_prs: [...], prs_with_new_comments: [...]}
 
