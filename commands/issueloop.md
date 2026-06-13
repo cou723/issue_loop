@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Read", "Write(.issue-loop/pr-sync-gather.sh)", "Edit(.gitignore)", "Bash(mkdir -p .issue-loop)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
+allowed-tools: ["Read", "Edit(.gitignore)", "Bash(mkdir -p .issue-loop)", "Bash(git checkout -b *)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/out-of-scope.md)", "Agent", "Skill"]
 ---
 
 # Issue Loop
@@ -32,13 +32,8 @@ STOPPING:
 ## セットアップ
 
 1. `mkdir -p .issue-loop` を実行する
-2. Write ツールで `.issue-loop/pr-sync-gather.sh` を以下の内容で作成する（`${CLAUDE_PLUGIN_ROOT}` はスキル読み込み時に実パスへ置換済み）:
-   ```
-   #!/bin/bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/pr-sync-gather.sh" "$@"
-   ```
-3. Read ツールで `.gitignore` を読み、`.issue-loop*` が含まれていなければ末尾に追記する
-4. `rm -f .issue-loop/cancel-requested` を実行してキャンセルフラグをリセットする
+2. Read ツールで `.gitignore` を読み、`.issue-loop*` が含まれていなければ末尾に追記する
+3. `rm -f .issue-loop/cancel-requested` を実行してキャンセルフラグをリセットする
 
 ## 開始メッセージ
 
