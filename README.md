@@ -41,7 +41,8 @@ bash scripts/deploy-local.sh
 |---|---|---|
 | `--max-iterations N` | 最大イテレーション数 | 20 |
 | `--max-review-iterations N` | 1イテレーション内の最大レビュー回数 | 3 |
-| `--interactive` | 情報不足時にユーザーへ質問する（無指定時は完全無人で実行） | 無効 |
+
+Issue の情報が不足している場合はループを一時停止し、ユーザーへ質問してから実装を続行します（有人実行）。
 
 ループを中断するには:
 
@@ -69,6 +70,9 @@ bash scripts/deploy-local.sh
       "Bash(rm -f .issue-loop/out-of-scope.md)",
       "Bash(rm -f .issue-loop/review-result.md)",
       "Bash(rm -f .issue-loop/iteration-signal)",
+      "Bash(rm -f .issue-loop/questions.md)",
+      "Bash(rm -f .issue-loop/answers.md)",
+      "Bash(test -f .issue-loop/questions.md)",
       "Bash(git add *)",
       "Bash(git diff *)",
       "Bash(git commit *)",

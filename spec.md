@@ -15,7 +15,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 - **`iteration`**：1イテレーション（PR同期→Issue選定→実装→レビュー→PR作成）全体を担うオーケストレーター。各サブエージェントをネストして呼び出し、終了時に `iteration-signal` へ結果を書き出す
 - **`pr-sync`**：前回チェック時点との差分を取得し、マージ済みPRと新規コメントが付いたPRを検出する。新規コメント付きPRからは Issue を自動作成し、重複防止のためPRにコメントで記録する。結果を `pr-context.md` に書き出す
 - **`pick-issue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報を考慮して判断する
-- **`info-gathering`**：Issue の不足情報を確認する。`--interactive` 指定時のみ `AskUserQuestion` でユーザーへ質問し回答を Issue に追記する。無人実行時（デフォルト）は質問せず、不足観点を `current-issue.md` に追記して進める
+- **`info-gathering`**：Issue の不足情報を確認する。`AskUserQuestion` はサブエージェントから使えないため自分では質問せず、不足があれば質問内容を `questions.md` に書き出してメインセッションへ委ねる（エスカレーション方式）。再開時は `answers.md` の回答を `current-issue.md` と Issue に取り込んで進める
 - **`pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
 - **`implement`**：実装を行う。`feature-dev:code-explorer` で調査し、実装後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
 - **`debug`**：デバッグを行う。`feature-dev:code-explorer` で根本原因を特定し、修正を実装する。最後にスコープ外の発見事項を書き出す
@@ -30,7 +30,10 @@ flowchart TD
     B --> C{Issue あり?}
     C -- なし --> Z[ループ終了]
     C -- あり --> D[infoGathering]
-    D --> E[pattern]
+    D --> N{情報不足?}
+    N -- "あり" --> Q["NEEDS_INPUT で停止<br/>メインが AskUserQuestion<br/>→ 回答を書き戻して再開"]
+    Q --> D
+    N -- "なし" --> E[pattern]
     E --> F["git checkout main → git checkout -b &lt;branch&gt;"]
     F --> G{next-action}
     G -- implement --> H[implement]
@@ -55,7 +58,11 @@ flowchart TD
 - ユーザーが `/cancel` を実行（`.issue-loop/cancel-requested` フラグを検出 → `CANCELLED` シグナル）
 - イテレーションが続行不能な失敗で終了（`FAILED` シグナル、またはシグナル未書き込みの異常終了）
 
-各イテレーションは終了時に `.issue-loop/iteration-signal` へ `DONE` / `NO_ISSUE` / `CANCELLED` / `FAILED` のいずれかを書き出す。オーケストレーターはイテレーション起動前に同ファイルを削除し、起動後に内容を読む。シグナルが空（サブエージェントのクラッシュ等）の場合も異常終了とみなしてループを停止する。
+各イテレーションは終了時に `.issue-loop/iteration-signal` へ `DONE` / `NO_ISSUE` / `CANCELLED` / `NEEDS_INPUT` / `FAILED` のいずれかを書き出す。オーケストレーターはイテレーション起動前に同ファイルを削除し、起動後に内容を読む。シグナルが空（サブエージェントのクラッシュ等）の場合も異常終了とみなしてループを停止する。
+
+### NEEDS_INPUT（ユーザーへの質問）
+
+`AskUserQuestion` はサブエージェントからは使えず、メインセッションの UI でのみ動作する。そのため info-gathering で情報不足を検出した場合、iteration は `questions.md` に質問を書き出し `NEEDS_INPUT` シグナルで停止する（ブランチ作成より前で止めるため Issue 選定状態は保たれる）。オーケストレーターは `questions.md` を読んで `AskUserQuestion` で質問し、回答を `answers.md` に書き戻したうえで iteration を `RESUME=true` で再起動する。再起動時は PR同期・Issue選定をスキップし、info-gathering が回答を取り込んで先へ進む。この再開はイテレーション数にカウントしない。
 
 エラー発生時の挙動：必須ファイルの欠落・PR 作成失敗など続行不能な異常は、リトライやデバッグを繰り返さず `FAILED` を書いてループを停止する。同一 Issue を次イテレーションで無限に選び直す事故を防ぐため、PR が実在することを検証してから `DONE` とする。キャンセル要求は各ステップの区切りで検出し、現在のステップ完了後に停止する。
 
@@ -68,10 +75,12 @@ flowchart TD
 | `pr-snapshot.json` | /pr-sync | /pr-sync | 前回チェック時刻（`checked_at`）を保持するJSON |
 | `pr-context.md` | /pr-sync | /pickIssue | 前回チェックからの差分（マージ済みPR一覧・新規コメント起因のIssue一覧） |
 | `current-issue.md` | /pickIssue, /infoGathering, /pattern | /pattern, /implement, /debug | Issue の詳細・収集情報・タイプ |
+| `questions.md` | /infoGathering | /issueloop | 情報不足時にユーザーへ尋ねる質問（`AskUserQuestion` 形式）。存在＝要ユーザー入力 |
+| `answers.md` | /issueloop | /infoGathering | ユーザーの回答。再開時に info-gathering が取り込む |
 | `next-action.md` | /pattern, /review | /issueloop | `implement` または `debug` の判定結果 |
 | `review-result.md` | /review | /implement, /debug, /issueloop | レビュー結果・指摘内容・推奨アクション・合否 |
 | `out-of-scope.md` | /implement, /debug, /review | /issue-update | スコープ外の発見事項リスト |
-| `iteration-signal` | /iteration | /issueloop | イテレーション結果（`DONE`/`NO_ISSUE`/`CANCELLED`/`FAILED`）。起動前にオーケストレーターが削除する |
+| `iteration-signal` | /iteration | /issueloop | イテレーション結果（`DONE`/`NO_ISSUE`/`CANCELLED`/`NEEDS_INPUT`/`FAILED`）。起動前にオーケストレーターが削除する |
 | `cancel-requested` | /cancel | /issueloop, /iteration | キャンセル要求フラグ（存在＝要求あり） |
 
 `current-issue.md` の構造：
@@ -183,10 +192,10 @@ next-action: implement | debug
 
 | コンポーネント | 主要な allowed-tools |
 |---|---|
-| `/issueloop` | `Bash(bash *setup-issue-loop.sh:*)`, `Bash(git checkout -b:*)`, `Task` |
+| `/issueloop` | `Bash(bash *setup-issue-loop.sh:*)`, `Bash(git checkout -b:*)`, `Task`, `AskUserQuestion`, `Read`, `Write` |
 | `/pr-sync` | `Bash(gh pr list:*)`, `Bash(gh pr view:*)`, `Bash(gh issue create:*)`, `Bash(gh pr comment:*)`, `Read`, `Write` |
 | `/pickIssue` | `Bash(gh issue list:*)`, `Bash(gh issue view:*)`, `Bash(gh pr list:*)`, `Read`, `Write` |
-| `/infoGathering` | `Bash(gh issue comment:*)`, `Bash(gh issue view:*)`, `Read`, `Write`, `Task` |
+| `/infoGathering` | `Bash(gh issue comment:*)`, `Bash(gh issue view:*)`, `Read`, `Write` |
 | `/pattern` | `Read(.issue-loop/current-issue.md)`, `Write(.issue-loop/next-action.md)` |
 | `/review` | `Bash(git diff:*)`, `Read`, `Glob`, `Grep`, `Task`, `Write(.issue-loop/review-result.md)` |
 | `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Task`, `Write(.issue-loop/out-of-scope.md)` |

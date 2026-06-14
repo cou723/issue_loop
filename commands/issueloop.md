@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
-argument-hint: "[--max-iterations N] [--max-review-iterations N] [--interactive]"
-allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(grep * .issue-loop/iteration-signal)", "Agent"]
+argument-hint: "[--max-iterations N] [--max-review-iterations N]"
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(grep * .issue-loop/iteration-signal)", "Agent", "AskUserQuestion", "Read", "Write"]
 ---
 
 # Issue Loop
@@ -12,7 +12,6 @@ allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/can
 
 - `--max-iterations N` → MAX_ITERATIONS = N（デフォルト: 20）
 - `--max-review-iterations N` → MAX_REVIEW_ITERATIONS = N（デフォルト: 3）
-- `--interactive` → INTERACTIVE = true（デフォルト: false）。情報不足時にユーザーへ質問する
 - `-h` / `--help` → 以下を表示して終了:
 
 ```
@@ -24,14 +23,13 @@ USAGE:
 OPTIONS:
   --max-iterations N          最大イテレーション数（デフォルト: 20）
   --max-review-iterations N   1イテレーション内の最大レビュー回数（デフォルト: 3）
-  --interactive               情報不足時にユーザーへ質問する（デフォルト: 無人実行）
 
 STOPPING:
   /issue-loop:cancel でループを中断できます
   Issue がなくなった時点で自動終了します
 ```
 
-INTERACTIVE が false（デフォルト）の場合、ループは完全に無人で動作し、情報不足の Issue でも質問せず利用可能な情報のみで進める。
+このループは**有人実行**を前提とする。Issue の情報が不足している場合は、ループを止めてユーザーへ質問し（後述の `NEEDS_INPUT` 処理）、回答を得てから実装を進める。
 
 ## セットアップ
 
@@ -66,10 +64,13 @@ iteration = 1 から始め MAX_ITERATIONS 回を上限に以下を繰り返す�
 
 ### イテレーション実行
 
-`rm -f .issue-loop/iteration-signal` を実行し、前イテレーションのシグナルをクリアする（クラッシュ時に古いシグナルを誤読しないため）。
+前イテレーションの遺物をクリアする（古いシグナルや質問・回答を誤読しないため）:
+- `rm -f .issue-loop/iteration-signal`
+- `rm -f .issue-loop/questions.md`
+- `rm -f .issue-loop/answers.md`
 
 Agent ツールで `issue-loop:iteration` サブエージェントを起動する。
-- prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, INTERACTIVE = <INTERACTIVE>"
+- prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = false"
 
 ---
 
@@ -80,8 +81,33 @@ Agent ツールで `issue-loop:iteration` サブエージェントを起動す�
 - `NO_ISSUE` → 「✅ 取り組む Issue がなくなりました。ループを終了します。」と表示してループを終了する
 - `CANCELLED` → 「🛑 キャンセルリクエストを受け付けました。」と表示してループを終了する
 - `FAILED` → 「❌ イテレーション <iteration> が失敗しました。安全のためループを終了します。`.issue-loop/` の状態を確認してください。」と表示してループを終了する
+- `NEEDS_INPUT` → **下記「ユーザーへの質問（NEEDS_INPUT 処理）」を実行する**。完了後、再度このシグナル確認を行う
 - **シグナルが空または存在しない**（出力が空）→ サブエージェントが結果を残さず終了した（異常終了の可能性）。「⚠️ イテレーション <iteration> が結果を残さず終了しました（異常終了の可能性）。安全のためループを終了します。」と表示してループを終了する
 - `DONE` → 正常完了。次へ進む
+
+---
+
+### ユーザーへの質問（NEEDS_INPUT 処理）
+
+`AskUserQuestion` はサブエージェントからは使えないため、質問はこのメインセッションが代行する。
+
+1. Read ツールで `.issue-loop/questions.md` を読む（存在しない場合は異常。「⚠️ NEEDS_INPUT が返りましたが質問が見つかりません。安全のためループを終了します。」と表示してループを終了する）
+2. `questions.md` の各質問（`question` / `header` / `multiSelect` / 選択肢）を `AskUserQuestion` ツールの形式に変換し、まとめて質問する
+3. 得られた回答を Write ツールで `.issue-loop/answers.md` に書き出す（形式は下記）
+4. `rm -f .issue-loop/iteration-signal` でシグナルをクリアする
+5. Agent ツールで `issue-loop:iteration` サブエージェントを**再起動**する。
+   - prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = true"
+   - **iteration カウントは増やさない**（同じ Issue の続きを実行するため）
+
+`answers.md` の形式:
+
+```markdown
+---
+issue: <number>
+---
+- <質問文>: <ユーザーの回答>
+- <質問文>: <ユーザーの回答>
+```
 
 ---
 

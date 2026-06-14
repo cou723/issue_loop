@@ -1,14 +1,14 @@
 ---
 name: iteration
 description: issue-loopの1イテレーション（PR同期→Issue選定→実装→レビュー→PR作成）を全て実行する。メインセッションから各イテレーションで呼ばれる。
-tools: Read, Bash(bash *), Bash(git checkout -b *), Bash(git checkout main), Bash(git pull *), Bash(git branch *), Bash(rm -f .issue-loop/out-of-scope.md), Bash(rm -f .issue-loop/review-result.md), Bash(test -f .issue-loop/cancel-requested), Bash(gh pr list *), Bash(gh pr comment *), Agent, Skill, Write
+tools: Read, Bash(bash *), Bash(git checkout -b *), Bash(git checkout main), Bash(git pull *), Bash(git branch *), Bash(rm -f .issue-loop/out-of-scope.md), Bash(rm -f .issue-loop/review-result.md), Bash(test -f .issue-loop/cancel-requested), Bash(test -f .issue-loop/questions.md), Bash(gh pr list *), Bash(gh pr comment *), Agent, Skill, Write
 ---
 
 あなたは issue-loop の1イテレーションを担当するエージェントです。PR同期から始まりPR作成まで全ステップを自律的に実行し、最後に `.issue-loop/iteration-signal` へ結果を書き出して終了します。
 
 prompt からパラメータを読み取る:
 - `MAX_REVIEW_ITERATIONS` = 指定された値（デフォルト: 3）
-- `INTERACTIVE` = 指定された値（デフォルト: false）
+- `RESUME` = 指定された値（デフォルト: false）。ユーザーへの質問後にメインセッションから再開された場合に true
 
 ## 終了シグナルの規約
 
@@ -17,7 +17,12 @@ prompt からパラメータを読み取る:
 - `DONE` — 正常完了
 - `NO_ISSUE` — 取り組む Issue がない
 - `CANCELLED` — キャンセル要求を検知して中断
+- `NEEDS_INPUT` — 実装に必要な情報が不足しユーザーへの質問が必要（質問内容は `.issue-loop/questions.md` に書き出し済み）。Issue 選定状態は保持される
 - `FAILED` — 続行不能な失敗（必須ファイルの欠落・PR作成失敗など）
+
+## RESUME（再開）時の挙動
+
+`RESUME` が true の場合、ユーザーへの質問が済んで再開されたことを意味する。ステップ 1（PR同期）とステップ 2（Issue選定）を**スキップ**し、`.issue-loop/current-issue.md` は前回選定したものをそのまま使う。ステップ 4（情報収集）から再開する（このとき info-gathering は `.issue-loop/answers.md` の回答を取り込んで進むため、再度質問することはない）。
 
 ## キャンセルチェック（各ステップの前に実施）
 
@@ -45,7 +50,12 @@ Read ツールで `.issue-loop/current-issue.md` を読む。
 ## ステップ 4: 情報収集
 
 Agent ツールで `issue-loop:loop:info-gathering` サブエージェントを起動する。
-- prompt: "`.issue-loop/current-issue.md` を読み、実装に必要な情報が揃っているか確認してください。INTERACTIVE = <INTERACTIVE>"
+- prompt: "`.issue-loop/current-issue.md` を読み、実装に必要な情報が揃っているか確認してください。`.issue-loop/answers.md` が存在する場合はその回答を取り込んでください。"
+
+info-gathering 完了後、`test -f .issue-loop/questions.md && echo NEEDS || echo OK` を実行する。
+
+- `NEEDS` → 実装に必要な情報が不足しており、質問が `questions.md` に書き出された。`.issue-loop/iteration-signal` に `NEEDS_INPUT` と書いて**即座に終了**する（ブランチ作成より前に止めることで、選定済み Issue の状態を保ったままメインセッションへ質問を委ねる）
+- `OK` → 情報は十分。次へ進む
 
 ## ステップ 5: Issue分類
 
