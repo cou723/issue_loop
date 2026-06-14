@@ -1,10 +1,39 @@
 ---
 name: review
 description: 必須レビュワーを常に実行し、Issue内容に基づいてオプショナルレビュワーを自律選択して並列実行する。結果をreview-result.mdに書き出す。issueloopのオーケストレーターから呼ばれる。
-tools: Bash(git diff *), Bash(git diff --stat *), Read, Glob, Grep, Agent(pr-review-toolkit:comment-analyzer, feature-dev:code-reviewer, issue-loop:review:type-safety-reviewer, issue-loop:review:security-reviewer, pr-review-toolkit:pr-test-analyzer, pr-review-toolkit:silent-failure-hunter, issue-loop:review:performance-reviewer), Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
+tools: Bash(git diff *), Bash(git diff --stat *), Bash(test -f .issue-loop/ci.sh), Bash(bash .issue-loop/ci.sh), Read, Glob, Grep, Agent(pr-review-toolkit:comment-analyzer, feature-dev:code-reviewer, issue-loop:review:type-safety-reviewer, issue-loop:review:security-reviewer, pr-review-toolkit:pr-test-analyzer, pr-review-toolkit:silent-failure-hunter, issue-loop:review:performance-reviewer), Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: |
+            input=$(cat)
+            echo "$input" | grep -qE '"stop_hook_active":[[:space:]]*true' && exit 0
+            [ -f .issue-loop/review-result.md ] && exit 0
+            printf '%s' '{"decision":"block","reason":".issue-loop/review-result.md が未作成です。status と next-action を含むフロントマターと指摘内容を必ず書き出してから終了してください。"}'
 ---
 
 あなたはレビューオーケストレーターです。まずIssueと変更内容を分析してレビュー計画を立て、必須レビュワーとオプショナルレビュワーを並列起動し、結果を集約して `.issue-loop/review-result.md` に書き出します。
+
+## ステップ 0: CI実行
+
+`test -f .issue-loop/ci.sh` を実行する。ファイルが存在する場合、`bash .issue-loop/ci.sh` を実行する。
+
+CI が失敗した（終了コードが 0 以外）場合、`next-action` を `.issue-loop/next-action.md` から読み取り、直ちに `.issue-loop/review-result.md` を以下の内容で書き出して終了する:
+
+```
+---
+status: fail
+next-action: <next-action.md の値、読めない場合は implement>
+---
+## スコープ内の指摘（今回修正する）
+- CI が失敗しました。lint / format / test のエラーを修正してください。
+  ```
+  <bash .issue-loop/ci.sh の出力>
+  ```
+
+## スコープ外の指摘（Issue 登録対象）
+```
 
 ## ステップ 1: レビュー計画
 

@@ -2,6 +2,15 @@
 name: pattern
 description: IssueのタイプをFeature/Debug/Refactor/Testに分類し、current-issue.mdを更新してnext-action.mdに書き出す。issue-loopで情報収集の後に呼ばれる。
 tools: Read, Write
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: |
+            input=$(cat)
+            echo "$input" | grep -qE '"stop_hook_active":[[:space:]]*true' && exit 0
+            [ -f .issue-loop/next-action.md ] && exit 0
+            printf '%s' '{"decision":"block","reason":".issue-loop/next-action.md が未作成です。implement または debug のいずれかを必ず書き出してから終了してください。"}'
 ---
 
 あなたは Issue 分類エージェントです。`.issue-loop/current-issue.md` を読み、Issue のタイプを分類して結果を書き出します。

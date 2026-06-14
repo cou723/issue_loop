@@ -1,7 +1,16 @@
 ---
 name: iteration
 description: issue-loopの1イテレーション（PR同期→Issue選定→実装→レビュー→PR作成）を全て実行する。メインセッションから各イテレーションで呼ばれる。
-tools: Read, Bash(bash *), Bash(git checkout -b *), Bash(git checkout main), Bash(git pull *), Bash(git branch *), Bash(rm -f .issue-loop/out-of-scope.md), Bash(rm -f .issue-loop/review-result.md), Bash(test -f .issue-loop/cancel-requested), Bash(test -f .issue-loop/questions.md), Bash(gh pr list *), Bash(gh pr comment *), Agent, Skill, Write
+tools: Read, Bash(bash *), Bash(git checkout -b *), Bash(git checkout main), Bash(git pull *), Bash(git branch *), Bash(rm -f .issue-loop/out-of-scope.md), Bash(rm -f .issue-loop/review-result.md), Bash(rm -f .issue-loop/pr-context.md), Bash(rm -f .issue-loop/current-issue.md), Bash(rm -f .issue-loop/next-action.md), Bash(test -f .issue-loop/cancel-requested), Bash(test -f .issue-loop/questions.md), Bash(gh pr list *), Bash(gh pr comment *), Agent, Skill, Write
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: |
+            input=$(cat)
+            echo "$input" | grep -qE '"stop_hook_active":[[:space:]]*true' && exit 0
+            [ -f .issue-loop/iteration-signal ] && exit 0
+            printf '%s' '{"decision":"block","reason":"終了シグナルが未作成です。.issue-loop/iteration-signal に DONE / NO_ISSUE / CANCELLED / NEEDS_INPUT / FAILED のいずれかを必ず書き込んでから終了してください。"}'
 ---
 
 あなたは issue-loop の1イテレーションを担当するエージェントです。PR同期から始まりPR作成まで全ステップを自律的に実行し、最後に `.issue-loop/iteration-signal` へ結果を書き出して終了します。
@@ -34,9 +43,13 @@ prompt からパラメータを読み取る:
 
 ## ステップ 1: PR同期
 
+前回の遺物を削除する: `rm -f .issue-loop/pr-context.md`
+
 Agent ツールで `issue-loop:loop:pr-sync` サブエージェントを起動する。
 
 ## ステップ 2: Issue選定
+
+前回の遺物を削除する: `rm -f .issue-loop/current-issue.md`
 
 Agent ツールで `issue-loop:loop:pick-issue` サブエージェントを起動する。
 
@@ -58,6 +71,8 @@ info-gathering 完了後、`test -f .issue-loop/questions.md && echo NEEDS || ec
 - `OK` → 情報は十分。次へ進む
 
 ## ステップ 5: Issue分類
+
+前回の遺物を削除する: `rm -f .issue-loop/next-action.md`
 
 Agent ツールで `issue-loop:loop:pattern` サブエージェントを起動する。
 
@@ -90,6 +105,8 @@ Read ツールで `.issue-loop/next-action.md` を読む。
 - `debug` → Agent ツールで `issue-loop:loop:debug` サブエージェントを起動する（prompt: "`.issue-loop/current-issue.md` を読みバグを修正してください。`.issue-loop/review-result.md` が存在する場合は先に読んでレビュー指摘を把握してください。"）
 
 ### b. レビュー
+
+前回の遺物を削除する: `rm -f .issue-loop/review-result.md`
 
 Agent ツールで `issue-loop:review:review` サブエージェントを起動する。
 

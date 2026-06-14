@@ -2,6 +2,15 @@
 name: pick-issue
 description: GitHubから最優先で取り組むべきIssueを1つ選んでcurrent-issue.mdに書き出す。issue-loopの各イテレーションでpr-syncの後に呼ばれる。
 tools: Bash, Read, Write
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: |
+            input=$(cat)
+            echo "$input" | grep -qE '"stop_hook_active":[[:space:]]*true' && exit 0
+            [ -f .issue-loop/current-issue.md ] && exit 0
+            printf '%s' '{"decision":"block","reason":".issue-loop/current-issue.md が未作成です。取り組む Issue がない場合でも title: \"NO_ISSUE\" のフロントマターを必ず書き出してから終了してください。"}'
 ---
 
 あなたは Issue 選定エージェントです。GitHub のオープン Issue を取得し、最優先で取り組むべき Issue を1つ選んで `.issue-loop/current-issue.md` に書き出します。

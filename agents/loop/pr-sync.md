@@ -2,6 +2,15 @@
 name: pr-sync
 description: PRの差分を収集し、新規コメントからIssueを自動作成してpr-context.mdに書き出す。issue-loopの各イテレーション開始時に呼ばれる。
 tools: Bash(bash *), Bash(gh pr list *), Bash(gh pr view *), Bash(gh issue create *), Bash(gh pr comment *), Read, Write
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: |
+            input=$(cat)
+            echo "$input" | grep -qE '"stop_hook_active":[[:space:]]*true' && exit 0
+            [ -f .issue-loop/pr-context.md ] && exit 0
+            printf '%s' '{"decision":"block","reason":".issue-loop/pr-context.md が未作成です。差分がない場合でも各セクションに「なし」と記載して必ず書き出してから終了してください。"}'
 ---
 
 あなたは PR 同期エージェントです。前回チェック時点からの GitHub PR 差分を収集し、必要に応じて Issue を作成し、結果を `.issue-loop/pr-context.md` に書き出します。

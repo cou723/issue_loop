@@ -1,7 +1,7 @@
 ---
 description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
 argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(grep * .issue-loop/iteration-signal)", "Agent", "AskUserQuestion", "Read", "Write"]
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(grep * .issue-loop/iteration-signal)", "Agent", "AskUserQuestion", "Read", "Write"]
 ---
 
 # Issue Loop
@@ -34,6 +34,23 @@ STOPPING:
 ## セットアップ
 
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh"` を実行する。
+
+## CI スクリプト生成
+
+`test -f .issue-loop/ci.sh` を実行し、ファイルが**存在しない場合のみ**以下を行う。
+
+以下のファイルを Read で確認し、このプロジェクトのビルドシステムと使用可能なCIコマンドを判断する:
+
+- `package.json`（lint / format / test スクリプトの有無）
+- `Makefile`（lint / test などターゲットの有無）
+- `Cargo.toml`（Rust: `cargo fmt --check`, `cargo clippy`, `cargo test`）
+- `pyproject.toml` / `setup.py`（Python: ruff, pytest など）
+- `go.mod`（Go: `go vet`, `go test ./...`）
+- `pom.xml` / `build.gradle`（Java / Kotlin: maven / gradle）
+
+判断したCIコマンドを組み合わせた `.issue-loop/ci.sh` を Write で生成する（全チェックが通る場合のみ終了コード 0 を返す構成にする）。その後 `chmod +x .issue-loop/ci.sh` を実行する。
+
+ビルドシステムが判断できない場合は、`.issue-loop/ci.sh` を生成せずスキップする。
 
 ## 開始メッセージ
 
