@@ -13,7 +13,7 @@ GitHub Issue ベースの自動開発ループを実現する Claude Code プラ
 `review` ステップが以下のプラグインのエージェントを利用します。事前にインストールしてください。
 
 - `pr-review-toolkit`（`comment-analyzer`, `pr-test-analyzer`, `silent-failure-hunter`, `code-simplifier`）
-- `feature-dev`（`code-explorer`, `code-reviewer`）
+- `feature-dev`（`code-explorer`）
 
 ## セットアップ
 

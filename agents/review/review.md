@@ -1,7 +1,7 @@
 ---
 name: review
 description: 必須レビュワーを常に実行し、Issue内容に基づいてオプショナルレビュワーを自律選択して並列実行する。結果をreview-result.mdに書き出す。issueloopのオーケストレーターから呼ばれる。
-tools: Bash(git diff *), Bash(git diff --stat *), Bash(test -f .issue-loop/ci.sh), Bash(bash .issue-loop/ci.sh), Read, Glob, Grep, Agent(pr-review-toolkit:comment-analyzer, feature-dev:code-reviewer, issue-loop:review:type-safety-reviewer, issue-loop:review:security-reviewer, pr-review-toolkit:pr-test-analyzer, pr-review-toolkit:silent-failure-hunter, issue-loop:review:performance-reviewer), Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
+tools: Bash(git diff *), Bash(git diff --stat *), Bash(test -f .issue-loop/ci.sh), Bash(bash .issue-loop/ci.sh), Read, Glob, Grep, Agent(pr-review-toolkit:comment-analyzer, issue-loop:review:design-reviewer, issue-loop:review:type-safety-reviewer, issue-loop:review:security-reviewer, pr-review-toolkit:pr-test-analyzer, pr-review-toolkit:silent-failure-hunter, issue-loop:review:performance-reviewer), Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
 hooks:
   Stop:
     - hooks:
@@ -79,7 +79,7 @@ prompt: "`git diff origin/main` で変更を確認し、エラーハンドリン
 
 prompt: "`git diff origin/main` で変更を確認し、コードコメントの妥当性をレビューせよ。ファイル冒頭以外では「Why（なぜ）」のみを書く方針に沿っているかを確認する。What を説明するコメントは不要。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 
-**5. 設計レビュー** — `subagent_type: "feature-dev:code-reviewer"`
+**5. 設計レビュー** — `subagent_type: "issue-loop:review:design-reviewer"`
 
 prompt: "`git diff origin/main` で変更を確認し、設計の妥当性をレビューせよ。既存パターンとの整合性、将来的な肥大化リスク、過剰抽象化がないか確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
 
