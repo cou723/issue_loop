@@ -83,6 +83,7 @@ flowchart TD
 | `pr-snapshot.json` | /pr-sync | /pr-sync | 前回チェック時刻（`checked_at`）を保持するJSON |
 | `pr-context.md` | /pr-sync | /pickIssue | 前回チェックからの差分（マージ済みPR一覧・新規コメント起因のIssue一覧） |
 | `current-issue.md` | /pickIssue, /infoGathering, /pattern | /pattern, /implement, /debug | Issue の詳細・収集情報・タイプ |
+| `issue-selection-comment.md` | /issueloop | /pickIssue | ユーザーが指定した Issue 選定基準。存在しない場合は既定基準で選定 |
 | `questions.md` | /infoGathering | /issueloop | 情報不足時にユーザーへ尋ねる質問（`AskUserQuestion` 形式）。存在＝要ユーザー入力 |
 | `answers.md` | /issueloop | /infoGathering | ユーザーの回答。再開時に info-gathering が取り込む |
 | `next-action.md` | /pattern, /review | /issueloop | `implement` または `debug` の判定結果 |
@@ -200,11 +201,11 @@ next-action: implement | debug
 
 | コンポーネント | 主要な allowed-tools |
 |---|---|
-| `/issueloop` | `Bash(bash *setup-issue-loop.sh:*)`, `Bash(git checkout -b:*)`, `Task`, `AskUserQuestion`, `Read`, `Write` |
-| `/pr-sync` | `Bash(gh pr list:*)`, `Bash(gh pr view:*)`, `Bash(gh issue create:*)`, `Bash(gh pr comment:*)`, `Read`, `Write` |
-| `/pickIssue` | `Bash(gh issue list:*)`, `Bash(gh issue view:*)`, `Bash(gh pr list:*)`, `Read`, `Write` |
-| `/infoGathering` | `Bash(gh issue comment:*)`, `Bash(gh issue view:*)`, `Read`, `Write` |
-| `/pattern` | `Read(.issue-loop/current-issue.md)`, `Write(.issue-loop/next-action.md)` |
-| `/review` | `Bash(git diff:*)`, `Read`, `Glob`, `Grep`, `Task`, `Write(.issue-loop/review-result.md)` |
-| `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Task`, `Write(.issue-loop/out-of-scope.md)` |
-| `/issue-update` | `Bash(gh issue create:*)`, `Bash(gh issue list:*)`, `Bash(gh issue view:*)`, `Read` |
+| `/issueloop` | `Bash(bash *setup-issue-loop.sh)`, `Bash(test -f .issue-loop/cancel-requested)`, `Bash(test -f .issue-loop/ci.sh)`, `Bash(chmod +x .issue-loop/ci.sh)`, `Bash(rm -f .issue-loop/iteration-signal)`, `Bash(rm -f .issue-loop/questions.md)`, `Bash(rm -f .issue-loop/answers.md)`, `Bash(rm -f .issue-loop/issue-selection-comment.md)`, `Bash(grep * .issue-loop/iteration-signal)`, `Agent`, `AskUserQuestion`, `Read`, `Write` |
+| `/pr-sync` | `Bash(gh pr list *)`, `Bash(gh pr view *)`, `Bash(gh issue create *)`, `Bash(gh pr comment *)`, `Read`, `Write` |
+| `/pickIssue` | `Bash(gh issue list *)`, `Bash(gh issue view *)`, `Bash(gh pr list *)`, `Read`, `Write` |
+| `/infoGathering` | `Bash(gh issue comment *)`, `Bash(gh issue view *)`, `Read`, `Write` |
+| `/pattern` | `Read`, `Write` |
+| `/review` | `Bash(git diff *)`, `Read`, `Glob`, `Grep`, `Agent`, `Write` |
+| `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Agent`, `Write` |
+| `/issue-update` | `Bash(gh issue create *)`, `Bash(gh issue list *)`, `Bash(gh issue view *)`, `Read`, `Write` |

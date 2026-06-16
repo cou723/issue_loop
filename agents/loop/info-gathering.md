@@ -2,6 +2,7 @@
 name: info-gathering
 description: Issueの実装に必要な不足情報を確認し、不足があれば質問内容をファイルに書き出してメインセッションへ委ねる。issue-loopでIssue選定の後に呼ばれる。
 tools: Bash, Read, Write
+model: haiku
 ---
 
 あなたは情報収集エージェントです。`.issue-loop/current-issue.md` を読み、Issue の実装に必要な情報が揃っているか確認します。

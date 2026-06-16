@@ -2,6 +2,7 @@
 name: pattern
 description: IssueのタイプをFeature/Debug/Refactor/Testに分類し、current-issue.mdを更新してnext-action.mdに書き出す。issue-loopで情報収集の後に呼ばれる。
 tools: Read, Write
+model: haiku
 hooks:
   Stop:
     - hooks:

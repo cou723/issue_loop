@@ -1,7 +1,7 @@
 ---
-description: "Issue-loop を開始する。サブエージェントをネストして Issue の選定から実装・レビュー・PR作成までループする"
-argument-hint: "[--max-iterations N] [--max-review-iterations N]"
-allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(grep * .issue-loop/iteration-signal)", "Agent", "AskUserQuestion", "Read", "Write"]
+description: "GitHub Issue を自動的に選定・実装・レビュー・PR作成まで繰り返し処理する自動開発ループを開始する。ユーザーが「issue loop を開始して」「未対応の Issue を自動で片付けて」「次の Issue に取り組んで」などと依頼した場合に呼び出される"
+argument-hint: "[-mi N] [--max-iterations N] [--max-review-iterations N] [--comment TEXT, -c TEXT] [-h, --help]"
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Bash(grep * .issue-loop/iteration-signal)", "Agent", "AskUserQuestion", "Read", "Write"]
 ---
 
 # Issue Loop
@@ -10,8 +10,9 @@ allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/can
 
 `$ARGUMENTS` から以下の値を解釈する（不明なオプションは無視する）:
 
-- `--max-iterations N` → MAX_ITERATIONS = N（デフォルト: 20）
+- `--max-iterations N` / `-mi N` → MAX_ITERATIONS = N（デフォルト: 20）
 - `--max-review-iterations N` → MAX_REVIEW_ITERATIONS = N（デフォルト: 3）
+- `--comment TEXT` / `-c TEXT` → ISSUE_SELECTION_COMMENT = TEXT
 - `-h` / `--help` → 以下を表示して終了:
 
 ```
@@ -21,8 +22,9 @@ USAGE:
   /issue-loop:issueloop [OPTIONS]
 
 OPTIONS:
-  --max-iterations N          最大イテレーション数（デフォルト: 20）
+  --max-iterations N, -mi N   最大イテレーション数（デフォルト: 20）
   --max-review-iterations N   1イテレーション内の最大レビュー回数（デフォルト: 3）
+  --comment TEXT, -c TEXT     Issue 選定時の追加基準（例: "バグ修正を優先"）
 
 STOPPING:
   /issue-loop:cancel でループを中断できます
@@ -34,6 +36,18 @@ STOPPING:
 ## セットアップ
 
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh"` を実行する。
+
+## Issue 選定コメントの設定
+
+`ISSUE_SELECTION_COMMENT` が指定されている場合:
+
+1. `.issue-loop/issue-selection-comment.md` にコメント本文を Write する
+2. ファイルの内容は `pick-issue` エージェントが選定基準として読み取る
+
+`ISSUE_SELECTION_COMMENT` が指定されていない場合:
+
+1. `rm -f .issue-loop/issue-selection-comment.md` を実行してファイルを削除する
+2. これにより `pick-issue` エージェントは既定の基準（マイルストーン・ラベル・番号順）で Issue を選定する
 
 ## CI スクリプト生成
 
@@ -61,6 +75,8 @@ STOPPING:
 
   最大イテレーション数: <MAX_ITERATIONS>
   最大レビュー回数/イテレーション: <MAX_REVIEW_ITERATIONS>
+  <ISSUE_SELECTION_COMMENT が指定されている場合のみ表示>
+  Issue 選定コメント: <ISSUE_SELECTION_COMMENT>
 
   中断するには /issue-loop:cancel を実行してください。
 ```

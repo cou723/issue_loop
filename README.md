@@ -39,8 +39,9 @@ bash scripts/deploy-local.sh
 
 | オプション | 説明 | デフォルト |
 |---|---|---|
-| `--max-iterations N` | 最大イテレーション数 | 20 |
+| `--max-iterations N`, `-mi N` | 最大イテレーション数 | 20 |
 | `--max-review-iterations N` | 1イテレーション内の最大レビュー回数 | 3 |
+| `--comment TEXT`, `-c TEXT` | Issue 選定時の追加基準 | なし |
 
 Issue の情報が不足している場合はループを一時停止し、ユーザーへ質問してから実装を続行します（有人実行）。
 
@@ -72,6 +73,7 @@ Issue の情報が不足している場合はループを一時停止し、ユ�
       "Bash(rm -f .issue-loop/iteration-signal)",
       "Bash(rm -f .issue-loop/questions.md)",
       "Bash(rm -f .issue-loop/answers.md)",
+      "Bash(rm -f .issue-loop/issue-selection-comment.md)",
       "Bash(test -f .issue-loop/questions.md)",
       "Bash(git add *)",
       "Bash(git diff *)",
