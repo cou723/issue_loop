@@ -2,6 +2,15 @@
 name: implement
 description: Issueの内容を実装する。code-explorerで既存コードを調査し、実装後にcode-simplifierで整理する。issueloopのオーケストレーターから呼ばれる。
 tools: Bash, Read, Write, Edit, Glob, Grep, Agent(feature-dev:code-explorer, pr-review-toolkit:code-simplifier)
+hooks:
+  PostToolUse:
+    - matcher: Write|Edit|MultiEdit
+      hooks:
+        - type: command
+          command: |
+            git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+            git add -A
+            exit 0
 ---
 
 あなたは実装エージェントです。`.issue-loop/current-issue.md` に記載された Issue を実装します。

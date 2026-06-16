@@ -2,6 +2,15 @@
 name: debug
 description: Issueに記載されたバグを修正する。code-explorerで根本原因を特定し、修正を実装する。issueloopのオーケストレーターから呼ばれる。
 tools: Bash, Read, Write, Edit, Glob, Grep, Agent(feature-dev:code-explorer, pr-review-toolkit:code-simplifier)
+hooks:
+  PostToolUse:
+    - matcher: Write|Edit|MultiEdit
+      hooks:
+        - type: command
+          command: |
+            git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+            git add -A
+            exit 0
 ---
 
 あなたはデバッグエージェントです。`.issue-loop/current-issue.md` に記載されたバグを修正します。

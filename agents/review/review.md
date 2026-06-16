@@ -3,6 +3,15 @@ name: review
 description: 必須レビュワーを常に実行し、Issue内容に基づいてオプショナルレビュワーを自律選択して並列実行する。結果をreview-result.mdに書き出す。issueloopのオーケストレーターから呼ばれる。
 tools: Bash(git diff *), Bash(git diff --stat *), Bash(test -f .issue-loop/ci.sh), Bash(bash .issue-loop/ci.sh), Read, Glob, Grep, Agent(pr-review-toolkit:comment-analyzer, issue-loop:review:design-reviewer, issue-loop:review:type-safety-reviewer, issue-loop:review:security-reviewer, pr-review-toolkit:pr-test-analyzer, pr-review-toolkit:silent-failure-hunter, issue-loop:review:performance-reviewer), Write(.issue-loop/review-result.md), Write(.issue-loop/out-of-scope.md)
 hooks:
+  PreToolUse:
+    - matcher: Bash|Agent
+      hooks:
+        - type: command
+          command: |
+            git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+            git add -A
+            git diff HEAD -- . > .issue-loop/changes.diff 2>/dev/null || true
+            exit 0
   Stop:
     - hooks:
         - type: command
@@ -19,6 +28,7 @@ hooks:
 
 全レビュワー（自前・流用問わず）が従う共通の出力契約。各レビュワーの観点や重大度の定義はレビュワー自身が持つため、ここでは**スコープ分類と出力フォーマットのみ**を定める。ステップ2で各レビュワーへ渡す prompt には必ずこの契約への準拠を含めること。
 
+- **変更差分の参照先**: レビュー対象の変更は `.issue-loop/changes.diff`（この agent の PreToolUse hook が `git add -A` 済みの状態から生成する正準差分。新規ファイルも含む）を読むこと。各自で `git diff` を実行してはならない（base や 2点/3点の指定差で結果がブレ、レビューのスコープが不安定になるため）。
 - **スコープ分類**:
   - `scope_in`: この PR の変更で新たに導入された問題（今回修正する）
   - `scope_out`: 変更が触れた／露出させた既存コードの問題（記録のみ、今回は修正しない）
@@ -49,7 +59,7 @@ next-action: <next-action.md の値、読めない場合は implement>
 以下を実行して判断材料を集める:
 
 1. Read ツールで `.issue-loop/current-issue.md` を読む
-2. `git diff origin/main --stat` でどのファイルが変更されたか把握する
+2. Read ツールで `.issue-loop/changes.diff` を読み、どのファイルがどう変更されたか把握する（新規ファイルも含む正準差分。空の場合は変更なしとして扱う）
 
 集めた情報を元に、下記のオプショナルレビュワーを**それぞれ実行するかどうかを判断**する。判断は Issue のタイトル・説明・ラベルと変更ファイルの種類・パスに基づく。
 
@@ -68,7 +78,7 @@ next-action: <next-action.md の値、読めない場合は implement>
 
 以下を Agent ツールで**必ず**起動する。
 
-各 prompt は「`git diff origin/main` で変更を確認し、<観点>をレビューせよ。詳細な判断基準は自身の定義に従い、結果は上記『共通レビュー契約』のスコープ分類と JSON フォーマットで返す。」を基本形とする。観点の具体的なチェック項目は列挙しない（各レビュワー本体が保持するため）。
+各 prompt は「`.issue-loop/changes.diff` を読んで変更を確認し、<観点>をレビューせよ。各自で `git diff` は実行しないこと。詳細な判断基準は自身の定義に従い、結果は上記『共通レビュー契約』のスコープ分類と JSON フォーマットで返す。」を基本形とする。観点の具体的なチェック項目は列挙しない（各レビュワー本体が保持するため）。
 
 **1. 型安全性レビュー** — `subagent_type: "issue-loop:review:type-safety-reviewer"`、観点: 型安全性
 

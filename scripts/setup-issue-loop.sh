@@ -16,3 +16,4 @@ rm -f .issue-loop/cancel-requested
 rm -f .issue-loop/iteration-signal
 rm -f .issue-loop/review-result.md
 rm -f .issue-loop/out-of-scope.md
+rm -f .issue-loop/changes.diff
