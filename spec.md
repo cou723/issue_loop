@@ -14,7 +14,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 
 - **`iteration`**：1イテレーション（PR同期→Issue選定→実装→レビュー→PR作成）全体を担うオーケストレーター。各サブエージェントをネストして呼び出し、終了時に `iteration-signal` へ結果を書き出す
 - **`pr-sync`**：前回チェック時点との差分を取得し、マージ済みPRと新規コメントが付いたPRを検出する。新規コメント付きPRからは Issue を自動作成し、重複防止のためPRにコメントで記録する。結果を `pr-context.md` に書き出す
-- **`pick-issue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報を考慮して判断する
+- **`pick-issue`**：GitHub から最優先で取り組むべき Issue を1つ選ぶ。依存関係・既存PRの有無・`pr-context.md` のマージ情報で候補を絞り込み、ユーザー指定基準＞提供価値の高さ（バグ修正＞機能欠落の補完＞UX/品質改善＞cosmetic）＞マイルストーン/番号順で選定する
 - **`info-gathering`**：Issue の不足情報を確認する。`AskUserQuestion` はサブエージェントから使えないため自分では質問せず、不足があれば質問内容を `questions.md` に書き出してメインセッションへ委ねる（エスカレーション方式）。再開時は `answers.md` の回答を `current-issue.md` と Issue に取り込んで進める
 - **`pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
 - **`implement`**：実装を行う。`feature-dev:code-explorer` で調査し、実装後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
@@ -109,11 +109,14 @@ status: pass | fail
 next-action: implement | debug
 ---
 ## スコープ内の指摘（implement / debug に渡して今回修正する）
-- ...
+| 重大度 | 場所 | 指摘 |
+|---|---|---|
 
 ## スコープ外の指摘（Issue 登録対象）
 - ...
 ```
+
+出力量は結果に応じて調整する（認知負荷の削減）。`pass` の場合はスコープ内の表を省いて「なし」とだけ記し全体を短い要約に留め、`fail` の場合のみスコープ内の指摘を重大度の高い順に表で記載する。
 
 スコープ外の指摘は `out-of-scope.md` にも追記し、`/issue-update` が既存 Issue と照合して登録する。
 

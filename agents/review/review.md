@@ -103,12 +103,21 @@ status: pass | fail
 next-action: implement | debug
 ---
 ## スコープ内の指摘（今回修正する）
-- ...
+| 重大度 | 場所 | 指摘 |
+|---|---|---|
+| <CRITICAL/HIGH/MEDIUM/LOW> | `<file>:<line>` | <内容と推奨対応> |
 
 ## スコープ外の指摘（Issue 登録対象）
-- ...
+- <概要>
 ```
 
 判定: スコープ内の指摘が1件以上 → `status: fail`、0件 → `status: pass`
 `next-action` は `.issue-loop/next-action.md` の値を引き継ぐ。
 スコープ外の指摘は `.issue-loop/out-of-scope.md` にも追記する。
+
+### 出力量の調整（認知負荷の削減）
+
+後続ステップが読むトークンを抑えるため、結果に応じて詳細度を変える:
+
+- **`status: pass`** → スコープ内の表は書かず「なし」とだけ記載し、全体は5行程度の要約に留める
+- **`status: fail`** → スコープ内の指摘のみ上記の表形式で記載する（重大度の高い順）。スコープ外は箇条書きで簡潔に
