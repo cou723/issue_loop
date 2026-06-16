@@ -69,11 +69,6 @@ For each issue, report:
 3. **What it hides**: Specific errors the compiler can no longer catch
 4. **Recommendation**: Concrete alternative implementation
 
-## Scope Classification
+## Reporting Contract
 
-Classify each finding as:
-- **scope_in**: The assertion/suppression was introduced in this PR's changes
-- **scope_out**: Pre-existing in unchanged code (note it but don't require fixing in this PR)
-
-Return your findings as: `{"scope_in": [...], "scope_out": [...]}`
-Each entry: `"<severity> — <file>:<line> — <description>"`
+Scope classification (scope_in / scope_out) and the output format are defined by the **common review contract supplied by the caller**. Report findings in exactly that structure.

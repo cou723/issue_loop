@@ -23,24 +23,15 @@ You MUST stay scoped to the diff. Unbounded codebase crawling wastes context and
 3. **Over-abstraction** — Is there premature generalization (interfaces/generics/config for a single caller)? Could a simpler concrete implementation do the same job?
 4. **Cohesion & coupling** — Are responsibilities placed where they belong? Does the change introduce tight coupling that will be hard to unwind?
 
-## Output Format
+## Severity
 
-For each issue, report:
+Rate each finding, then give its location (`file:line`), reasoning, and a concrete simpler/consistent alternative.
 
-1. **Location**: File path and line number
-2. **Severity**:
-   - CRITICAL: Design that will actively cause bugs or block near-term work
-   - HIGH: Clear inconsistency with existing patterns, or abstraction that adds cost without payoff
-   - MEDIUM: Questionable structure that is tolerable but worth flagging
-   - LOW: Minor stylistic / organizational suggestions
-3. **Reasoning**: Why this is a design concern
-4. **Recommendation**: Concrete simpler/consistent alternative
+- CRITICAL: Design that will actively cause bugs or block near-term work
+- HIGH: Clear inconsistency with existing patterns, or abstraction that adds cost without payoff
+- MEDIUM: Questionable structure that is tolerable but worth flagging
+- LOW: Minor stylistic / organizational suggestions
 
-## Scope Classification
+## Reporting Contract
 
-Classify each finding as:
-- **scope_in**: Introduced in this PR's changes
-- **scope_out**: Pre-existing in unchanged code (note it but don't require fixing in this PR)
-
-Return your findings as: `{"scope_in": [...], "scope_out": [...]}`
-Each entry: `"<severity> — <file>:<line> — <description>"`
+Scope classification (scope_in / scope_out) and the output format are defined by the **common review contract supplied by the caller**. Report findings in exactly that structure.

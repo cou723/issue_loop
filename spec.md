@@ -189,6 +189,12 @@ next-action: implement | debug
 | error-handling-reviewer | 例外の握りつぶし・silent failures がないか | `pr-review-toolkit:silent-failure-hunter` |
 | performance-reviewer | 明らかな非効率（N+1 クエリ・不要なループなど）がないか | 独自実装 |
 
+### 共通レビュー契約（関心の分離）
+
+各レビュワーは自身の**観点・重大度の定義**（ドメイン知識）のみを持ち、全レビュワーで共通する**スコープ分類（scope_in / scope_out）と出力フォーマット（`{"scope_in": [...], "scope_out": [...]}` の JSON）**はオーケストレーター（`/review`）が「共通レビュー契約」として一元定義し、各レビュワー起動時の prompt で注入する。Claude Code にはプロンプトの取り込み機構がないため、唯一の注入点であるオーケストレーターに契約を集約することで重複と定義のドリフトを防ぐ。流用元エージェント（pr-review-toolkit 系）にも同じ契約を prompt で適用する。
+
+オーケストレーターの prompt は観点を1行で指定し、チェック項目は列挙しない（各レビュワー本体が保持するため、二重管理を避ける）。
+
 ### スコープ内 / スコープ外の分類基準
 
 - **スコープ内**：今回の Issue の変更範囲内で発生している問題。`implement` または `debug` で即座に修正する

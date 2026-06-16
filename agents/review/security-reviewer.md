@@ -73,14 +73,10 @@ Analyze `git diff` output to identify security issues. Distinguish between issue
 - **MEDIUM**: Exploitable with preconditions (missing rate limiting, verbose errors in production)
 - **LOW**: Defense-in-depth improvements (missing security headers, minor info disclosure)
 
-## Output Format
+## Per-Issue Detail
 
-For each finding:
-1. **Vulnerability type** and OWASP category
-2. **Location**: File and line number
-3. **Severity**: CRITICAL / HIGH / MEDIUM / LOW
-4. **Attack scenario**: How would an attacker exploit this?
-5. **Recommendation**: Specific code fix
+For each finding, state the vulnerability type and OWASP category, its location (`file:line`), severity, the attack scenario, and a specific code fix.
 
-Return: `{"scope_in": [...], "scope_out": [...]}`
-Each entry: `"<severity> — <OWASP category> — <file>:<line> — <description>"`
+## Reporting Contract
+
+Scope classification (scope_in / scope_out) and the output format are defined by the **common review contract supplied by the caller**. Report findings in exactly that structure.

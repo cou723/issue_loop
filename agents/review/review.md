@@ -15,6 +15,15 @@ hooks:
 
 あなたはレビューオーケストレーターです。まずIssueと変更内容を分析してレビュー計画を立て、必須レビュワーとオプショナルレビュワーを並列起動し、結果を集約して `.issue-loop/review-result.md` に書き出します。
 
+## 共通レビュー契約
+
+全レビュワー（自前・流用問わず）が従う共通の出力契約。各レビュワーの観点や重大度の定義はレビュワー自身が持つため、ここでは**スコープ分類と出力フォーマットのみ**を定める。ステップ2で各レビュワーへ渡す prompt には必ずこの契約への準拠を含めること。
+
+- **スコープ分類**:
+  - `scope_in`: この PR の変更で新たに導入された問題（今回修正する）
+  - `scope_out`: 変更が触れた／露出させた既存コードの問題（記録のみ、今回は修正しない）
+- **出力フォーマット**: `{"scope_in": [...], "scope_out": [...]}` の JSON で返す。各要素は `"<重大度> — <file>:<line> — <説明>"` 形式の文字列
+
 ## ステップ 0: CI実行
 
 `test -f .issue-loop/ci.sh` を実行する。ファイルが存在する場合、`bash .issue-loop/ci.sh` を実行する。
@@ -59,37 +68,27 @@ next-action: <next-action.md の値、読めない場合は implement>
 
 以下を Agent ツールで**必ず**起動する。
 
-**1. 型安全性レビュー** — `subagent_type: "issue-loop:review:type-safety-reviewer"`
+各 prompt は「`git diff origin/main` で変更を確認し、<観点>をレビューせよ。詳細な判断基準は自身の定義に従い、結果は上記『共通レビュー契約』のスコープ分類と JSON フォーマットで返す。」を基本形とする。観点の具体的なチェック項目は列挙しない（各レビュワー本体が保持するため）。
 
-prompt: "`git diff origin/main` で変更を確認し、型安全性をレビューせよ。`as` キャスト・`any` 型・`@ts-ignore` などの型抑制が正当か確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
+**1. 型安全性レビュー** — `subagent_type: "issue-loop:review:type-safety-reviewer"`、観点: 型安全性
 
-**2. セキュリティレビュー** — `subagent_type: "issue-loop:review:security-reviewer"`
+**2. セキュリティレビュー** — `subagent_type: "issue-loop:review:security-reviewer"`、観点: セキュリティ（OWASP Top 10 相当）
 
-prompt: "`git diff origin/main` で変更を確認し、セキュリティ上の問題をレビューせよ（OWASP Top 10 相当）。インジェクション・認証バイパス・機密情報漏洩などを確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
-
-**3. エラーハンドリングレビュー** — `subagent_type: "pr-review-toolkit:silent-failure-hunter"`
-
-prompt: "`git diff origin/main` で変更を確認し、エラーハンドリングをレビューせよ。例外の握りつぶし・silent failures・不適切なフォールバックがないか確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
+**3. エラーハンドリングレビュー** — `subagent_type: "pr-review-toolkit:silent-failure-hunter"`、観点: エラーハンドリング（例外の握りつぶし・silent failures）
 
 ### オプショナルレビュワー（ステップ1の判断に基づき並列実行）
 
 実行すると判断した場合のみ Agent ツールで起動する。
 
-**4. コメントレビュー** — `subagent_type: "pr-review-toolkit:comment-analyzer"`
+prompt はステップ2冒頭の基本形に従い、観点のみ差し替える。
 
-prompt: "`git diff origin/main` で変更を確認し、コードコメントの妥当性をレビューせよ。ファイル冒頭以外では「Why（なぜ）」のみを書く方針に沿っているかを確認する。What を説明するコメントは不要。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
+**4. コメントレビュー** — `subagent_type: "pr-review-toolkit:comment-analyzer"`、観点: コードコメントの妥当性（ファイル冒頭以外は「Why」のみ。What の説明コメントは不要）
 
-**5. 設計レビュー** — `subagent_type: "issue-loop:review:design-reviewer"`
+**5. 設計レビュー** — `subagent_type: "issue-loop:review:design-reviewer"`、観点: 設計の妥当性（既存パターンとの整合性・肥大化リスク・過剰抽象化）
 
-prompt: "`git diff origin/main` で変更を確認し、設計の妥当性をレビューせよ。既存パターンとの整合性、将来的な肥大化リスク、過剰抽象化がないか確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
+**6. テストレビュー** — `subagent_type: "pr-review-toolkit:pr-test-analyzer"`、観点: テストカバレッジ（既存テストへの影響・新ロジックのテスト有無）
 
-**6. テストレビュー** — `subagent_type: "pr-review-toolkit:pr-test-analyzer"`
-
-prompt: "`git diff origin/main` で変更を確認し、テストカバレッジをレビューせよ。既存テストへの影響、新しいロジックに対応するテストが存在するか確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
-
-**7. パフォーマンスレビュー** — `subagent_type: "issue-loop:review:performance-reviewer"`
-
-prompt: "`git diff origin/main` で変更を確認し、パフォーマンス上の問題をレビューせよ。N+1クエリ・不要なループ・明らかな非効率を確認する。結果を `{\"scope_in\": [...], \"scope_out\": [...]}` JSON形式で返す。"
+**7. パフォーマンスレビュー** — `subagent_type: "issue-loop:review:performance-reviewer"`、観点: パフォーマンス（N+1クエリ・不要なループ・明らかな非効率）
 
 ## ステップ 3: 結果集約
 
