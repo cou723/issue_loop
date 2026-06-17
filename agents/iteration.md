@@ -127,11 +127,14 @@ Agent ツールで `issue-loop:loop:issue-update` サブエージェントを起
 
 Skill ツールで `issue-loop:push-and-pr` スキルを実行する。
 
+**`push-and-pr` スキルが完了しても、このエージェント（iteration）のタスクはまだ終わっていない。スキル完了後は必ず以下の「PR作成の検証」に進むこと。スキルの最終出力（PR URL など）をそのまま自分の完了報告にしてはならない。**
+
 ### PR作成の検証
 
 `git branch --show-current` で現在のブランチ名を取得し、`gh pr list --head <ブランチ名> --state open --json number` で PR が実在するか確認する。
 
 - PR が存在しない（push または PR 作成に失敗した）→ `FAILED` シグナルを書いて終了する。同じ Issue を次イテレーションで無限に選び直すのを防ぐため、ここで必ず停止する
+- **PR が存在する → `.issue-loop/iteration-signal` に `DONE` と直ちに書く**（完了メッセージの出力より前に必ず実行する）
 
 ### 未解決指摘の明示
 
@@ -139,4 +142,4 @@ Skill ツールで `issue-loop:push-and-pr` スキルを実行する。
 
 ## 完了
 
-PR の存在を確認できたら `.issue-loop/iteration-signal` に `DONE` と書いて終了する。
+`.issue-loop/iteration-signal` に `DONE` が書き込まれたことを確認し、完了メッセージを出力して終了する。

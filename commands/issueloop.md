@@ -1,7 +1,7 @@
 ---
 description: "GitHub Issue を自動的に選定・実装・レビュー・PR作成まで繰り返し処理する自動開発ループを開始する。ユーザーが「issue loop を開始して」「未対応の Issue を自動で片付けて」「次の Issue に取り組んで」などと依頼した場合に呼び出される"
 argument-hint: "[-mi N] [--max-iterations N] [--max-review-iterations N] [--comment TEXT, -c TEXT] [-h, --help]"
-allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Bash(grep * .issue-loop/iteration-signal)", "Agent", "AskUserQuestion", "Read", "Write"]
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Bash(grep * .issue-loop/iteration-signal)", "Bash(git branch *)", "Bash(gh pr list *)", "Agent", "AskUserQuestion", "Read", "Write"]
 ---
 
 # Issue Loop
@@ -115,7 +115,11 @@ Agent ツールで `issue-loop:iteration` サブエージェントを起動す�
 - `CANCELLED` → 「🛑 キャンセルリクエストを受け付けました。」と表示してループを終了する
 - `FAILED` → 「❌ イテレーション <iteration> が失敗しました。安全のためループを終了します。`.issue-loop/` の状態を確認してください。」と表示してループを終了する
 - `NEEDS_INPUT` → **下記「ユーザーへの質問（NEEDS_INPUT 処理）」を実行する**。完了後、再度このシグナル確認を行う
-- **シグナルが空または存在しない**（出力が空）→ サブエージェントが結果を残さず終了した（異常終了の可能性）。「⚠️ イテレーション <iteration> が結果を残さず終了しました（異常終了の可能性）。安全のためループを終了します。」と表示してループを終了する
+- **シグナルが空または存在しない**（出力が空）→ コンテキスト圧縮等でシグナル書き込みが漏れた可能性がある。以下の回復処理を行う:
+  1. `git branch --show-current` で現在のブランチ名を確認する
+  2. `gh pr list --head <ブランチ名> --state open --json number` で PR の存在を確認する
+  - PR が存在する → `DONE` として扱い、次へ進む。「⚠️ イテレーション <iteration>: シグナルが未作成でしたが PR が確認できたため DONE として続行します。」と表示する
+  - PR が存在しない → 「⚠️ イテレーション <iteration> が結果を残さず終了しました（異常終了の可能性）。安全のためループを終了します。」と表示してループを終了する
 - `DONE` → 正常完了。次へ進む
 
 ---

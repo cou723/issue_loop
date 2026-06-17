@@ -56,9 +56,9 @@ flowchart TD
 - 取り組む Issue が0件（`NO_ISSUE` シグナル）
 - `max_iterations` 超過
 - ユーザーが `/cancel` を実行（`.issue-loop/cancel-requested` フラグを検出 → `CANCELLED` シグナル）
-- イテレーションが続行不能な失敗で終了（`FAILED` シグナル、またはシグナル未書き込みの異常終了）
+- イテレーションが続行不能な失敗で終了（`FAILED` シグナル、またはシグナル未書き込みかつ PR も存在しない）
 
-各イテレーションは終了時に `.issue-loop/iteration-signal` へ `DONE` / `NO_ISSUE` / `CANCELLED` / `NEEDS_INPUT` / `FAILED` のいずれかを書き出す。オーケストレーターはイテレーション起動前に同ファイルを削除し、起動後に内容を読む。シグナルが空（サブエージェントのクラッシュ等）の場合も異常終了とみなしてループを停止する。
+各イテレーションは終了時に `.issue-loop/iteration-signal` へ `DONE` / `NO_ISSUE` / `CANCELLED` / `NEEDS_INPUT` / `FAILED` のいずれかを書き出す。オーケストレーターはイテレーション起動前に同ファイルを削除し、起動後に内容を読む。シグナルが空（コンテキスト圧縮等でシグナル書き込みが漏れた場合）には即停止せず、PR の存在を確認して DONE 相当と判断できればループを継続する。PR も確認できない場合のみ異常終了としてループを停止する。
 
 ### NEEDS_INPUT（ユーザーへの質問）
 
@@ -69,6 +69,8 @@ flowchart TD
 ### 出力契約の保証（Stop フック）
 
 「必ず特定のファイルを書き出して終了する」契約を持つエージェントは、フロントマターの `Stop` フックで自分の出力ファイルの存在を終了時に検証する。ファイルが未作成なら `decision: block` でエージェントに書き出しを促してから終了させる。LLM がステップを完了しながら最終的な書き出しだけを忘れて終了する事故を防ぐ安全網であり、ループ駆動を hook に依存させるものではない。
+
+**既知の制限**: エージェント frontmatter の `Stop` フックは、`Agent` ツールで起動したサブエージェント（sidechain セッション）には適用されないことが確認されている。stop_hook_summary レコードがサブエージェントセッションに記録されず、フック自体が発火しない。このため iteration エージェントの Stop フックは現時点では安全網として機能しておらず、プロンプト指示レベルの明示と、issueloop オーケストレーター側の回復ロジックで補完している。
 
 このフックが確実に機能するのは、対象ファイルが「呼び出し直前に削除され、呼ばれたら必ず書かれる」エージェントに限る（前イテレーションの残骸を存在チェックで誤判定しないため、オーケストレーターは各サブエージェント起動の直前に対象ファイルを削除する）。対象は iteration（`iteration-signal`）・pr-sync（`pr-context.md`）・pick-issue（`current-issue.md`）・pattern（`next-action.md`）・review（`review-result.md`）。条件付き出力や成果物がコード編集のみのエージェント（info-gathering・implement・debug・issue-update）はフック検証の対象外とする。
 
@@ -210,7 +212,7 @@ next-action: implement | debug
 
 | コンポーネント | 主要な allowed-tools |
 |---|---|
-| `/issueloop` | `Bash(bash *setup-issue-loop.sh)`, `Bash(test -f .issue-loop/cancel-requested)`, `Bash(test -f .issue-loop/ci.sh)`, `Bash(chmod +x .issue-loop/ci.sh)`, `Bash(rm -f .issue-loop/iteration-signal)`, `Bash(rm -f .issue-loop/questions.md)`, `Bash(rm -f .issue-loop/answers.md)`, `Bash(rm -f .issue-loop/issue-selection-comment.md)`, `Bash(grep * .issue-loop/iteration-signal)`, `Agent`, `AskUserQuestion`, `Read`, `Write` |
+| `/issueloop` | `Bash(bash *setup-issue-loop.sh)`, `Bash(test -f .issue-loop/cancel-requested)`, `Bash(test -f .issue-loop/ci.sh)`, `Bash(chmod +x .issue-loop/ci.sh)`, `Bash(rm -f .issue-loop/iteration-signal)`, `Bash(rm -f .issue-loop/questions.md)`, `Bash(rm -f .issue-loop/answers.md)`, `Bash(rm -f .issue-loop/issue-selection-comment.md)`, `Bash(grep * .issue-loop/iteration-signal)`, `Bash(git branch *)`, `Bash(gh pr list *)`, `Agent`, `AskUserQuestion`, `Read`, `Write` |
 | `/pr-sync` | `Bash(gh pr list *)`, `Bash(gh pr view *)`, `Bash(gh issue create *)`, `Bash(gh pr comment *)`, `Read`, `Write` |
 | `/pickIssue` | `Bash(gh issue list *)`, `Bash(gh issue view *)`, `Bash(gh pr list *)`, `Read`, `Write` |
 | `/infoGathering` | `Bash(gh issue comment *)`, `Bash(gh issue view *)`, `Read`, `Write` |
