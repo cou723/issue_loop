@@ -1,7 +1,7 @@
 ---
 name: pr-sync
 description: PRの差分を収集し、新規コメントからIssueを自動作成してpr-context.mdに書き出す。issue-loopの各イテレーション開始時に呼ばれる。
-tools: Bash(bash *), Bash(gh pr list *), Bash(gh pr view *), Bash(gh issue create *), Bash(gh pr comment *), Read, Write
+tools: Bash(bash *), Bash(gh pr list *), Bash(gh pr view *), Bash(gh issue create *), Bash(gh pr comment *), Bash(gh pr close *), Read, Write
 hooks:
   Stop:
     - hooks:
@@ -37,6 +37,9 @@ hooks:
    - `gh issue create --title "<簡潔なタイトル>" --body "PR #<number> のコメントより\n\n<コメント内容の要約>"`
 4. Issue 作成後、対象 PR に以下の形式でコメントを投稿する
    - `gh pr comment <number> --body "[issue-loop] Issue #<作成したIssue番号> を作成しました: <タイトル>"`
+5. Issue を作成した PR を以下のコマンドでクローズする
+   - `gh pr close <number> --comment "[issue-loop] このPRのレビュー指摘を Issue #<作成したIssue番号リスト> として登録しました。対応後に新しいPRを作成します。"`
+   - 1つの PR から複数 Issue を作成した場合は `#N, #M` のようにカンマ区切りで列挙する
 
 ## ステップ 3: pr-context.md 書き出し
 
