@@ -1,7 +1,7 @@
 ---
 name: type-safety-reviewer
 description: Use this agent to review TypeScript code changes for type safety violations. Checks for unjustified type assertions (as), any usage, ts-ignore/ts-expect-error suppressions, and lint suppression comments. Invoke when reviewing PRs or after implementing TypeScript features.
-tools: Glob, Grep, Read, Bash(git diff *)
+tools: Glob, Grep, Read
 model: inherit
 color: blue
 ---
@@ -16,6 +16,8 @@ You are a TypeScript type safety auditor. Your mission is to ensure that the typ
 4. **Type inference should be trusted** — Explicit type annotations are often unnecessary and can mask real mismatches.
 
 ## Review Process
+
+Read `.issue-loop/changes.diff` (the canonical change diff, already staged and including new files) as your primary input. Do not run `git diff` yourself.
 
 ### 1. Find All Type Suppressions
 
@@ -69,11 +71,6 @@ For each issue, report:
 3. **What it hides**: Specific errors the compiler can no longer catch
 4. **Recommendation**: Concrete alternative implementation
 
-## Scope Classification
+## Reporting Contract
 
-Classify each finding as:
-- **scope_in**: The assertion/suppression was introduced in this PR's changes
-- **scope_out**: Pre-existing in unchanged code (note it but don't require fixing in this PR)
-
-Return your findings as: `{"scope_in": [...], "scope_out": [...]}`
-Each entry: `"<severity> — <file>:<line> — <description>"`
+Scope classification (scope_in / scope_out) and the output format are defined by the **common review contract supplied by the caller**. Report findings in exactly that structure.

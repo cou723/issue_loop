@@ -1,12 +1,33 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "issue-loop",
+  "metadata": {
+    "description": "GitHub Issue を自動で選定・実装・レビュー・PR作成までループするプラグイン",
+    "version": "0.1.0"
+  },
+  "owner": {
+    "name": "cou723"
+  },
   "plugins": [
     {
       "name": "issue-loop",
-      "source": "./"
+      "source": "./",
+      "description": "GitHub Issue を自動で選定・実装・レビュー・PR作成までループするプラグイン",
+      "version": "0.1.0",
+      "category": "development",
+      "author": {
+        "name": "cou723"
+      },
+      "repository": "https://github.com/cou723/issue-loop-plugin",
+      "license": "MIT",
+      "keywords": [
+        "issue",
+        "automation",
+        "github",
+        "loop",
+        "pr"
+      ]
     }
   ],
-  "owner": {
-    "name": "coucha"
-  }
+  "version": "0.1.0"
 }

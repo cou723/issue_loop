@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "description": "GitHub Issue ベースの自動開発ループ。Issue を自動選定し、実装・レビュー・PR 作成をループし続ける",
   "author": {
-    "name": "coucha"
+    "name": "cou723"
   }
 }
