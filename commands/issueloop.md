@@ -129,10 +129,11 @@ Agent ツールで `issue-loop:iteration` サブエージェントを起動す�
 `AskUserQuestion` はサブエージェントからは使えないため、質問はこのメインセッションが代行する。
 
 1. Read ツールで `.issue-loop/questions.md` を読む（存在しない場合は異常。「⚠️ NEEDS_INPUT が返りましたが質問が見つかりません。安全のためループを終了します。」と表示してループを終了する）
-2. `questions.md` の各質問（`question` / `header` / `multiSelect` / 選択肢）を `AskUserQuestion` ツールの形式に変換し、まとめて質問する
-3. 得られた回答を Write ツールで `.issue-loop/answers.md` に書き出す（形式は下記）
-4. `rm -f .issue-loop/iteration-signal` でシグナルをクリアする
-5. Agent ツールで `issue-loop:iteration` サブエージェントを**再起動**する。
+2. フロントマターの `issue:` フィールドから Issue 番号を取得し、「⚠️ Issue #<number> の実装に必要な情報が不足しています。以下の質問に回答してください。」とテキストで表示する
+3. `questions.md` の各質問（`question` / `header` / `multiSelect` / 選択肢）を `AskUserQuestion` ツールの形式に変換し、まとめて質問する
+4. 得られた回答を Write ツールで `.issue-loop/answers.md` に書き出す（形式は下記）
+5. `rm -f .issue-loop/iteration-signal` でシグナルをクリアする
+6. Agent ツールで `issue-loop:iteration` サブエージェントを**再起動**する。
    - prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = true"
    - **iteration カウントは増やさない**（同じ Issue の続きを実行するため）
 

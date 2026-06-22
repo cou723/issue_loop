@@ -9,6 +9,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 - **`/issueloop`**：ループのオーケストレーター。セットアップ・ループ制御・各サブエージェントの呼び出しをすべて担う
 - **`/push-and-pr`**：コミット・プッシュ・PR作成を一括実行する（`commit-commands:commit-push-pr` を流用）
 - **`/cancel`**：実行中のループを中断する
+- **`/close-issues [N]`**：最新N件のマージ済みPRを対象に、関連するオープンIssueを一括クローズする。各(PR, Issue)ペアの判定は `pr-resolves-issue` エージェントへ委譲する
 
 ### Agents（コンテキストを分離して実行するサブエージェント）
 
@@ -21,6 +22,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 - **`debug`**：デバッグを行う。`feature-dev:code-explorer` で根本原因を特定し、修正を実装する。最後にスコープ外の発見事項を書き出す
 - **`review`**：7つの専門エージェントを並列実行して変更内容をレビューする。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
 - **`issue-update`**：`implement` や `debug` が書き出したスコープ外の発見事項を統合・整理したうえで既存 Issue と照合し、重複のない新規 Issue を登録する
+- **`pr-resolves-issue`**：PR番号とIssue番号を受け取り、そのPRがIssueを解決しているかを `yes`/`no` で `.issue-loop/close-check/pr<N>-issue<M>.txt` に書き出す。`/close-issues` から各ペアに対して並列で呼ばれる
 
 ## ループのフロー（1イテレーション）
 
