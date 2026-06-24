@@ -90,6 +90,7 @@ Agent ツールで `issue-loop:loop:pattern` サブエージェントを起動�
 前イテレーションの残骸を必ずクリアする（別 Issue の指摘を誤って引き継がないため）:
 - `rm -f .issue-loop/out-of-scope.md`
 - `rm -f .issue-loop/review-result.md`
+- `rm -f .issue-loop/changes.diff`
 
 ## ステップ 7: 実装・レビューループ
 

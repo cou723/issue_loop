@@ -23,6 +23,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 - **`review`**：7つの専門エージェントを並列実行して変更内容をレビューする。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
 - **`issue-update`**：`implement` や `debug` が書き出したスコープ外の発見事項を統合・整理したうえで既存 Issue と照合し、重複のない新規 Issue を登録する
 - **`pr-resolves-issue`**：PR番号とIssue番号を受け取り、そのPRがIssueを解決しているかを `yes`/`no` で `.issue-loop/close-check/pr<N>-issue<M>.txt` に書き出す。`/close-issues` から各ペアに対して並列で呼ばれる
+- **`result-dashboard`**：ループ終了後に自動的に呼ばれ、今回の実行結果を集計・表示する。`gh pr list` で作成PRを取得し、Claude Code の JSONL ログを Python で解析してトークン使用量を集計する
 
 ## ループのフロー（1イテレーション）
 
@@ -95,6 +96,7 @@ flowchart TD
 | `out-of-scope.md` | /implement, /debug, /review | /issue-update | スコープ外の発見事項リスト |
 | `iteration-signal` | /iteration | /issueloop | イテレーション結果（`DONE`/`NO_ISSUE`/`CANCELLED`/`NEEDS_INPUT`/`FAILED`）。起動前にオーケストレーターが削除する |
 | `cancel-requested` | /cancel | /issueloop, /iteration | キャンセル要求フラグ（存在＝要求あり） |
+| `start-time` | setup-issue-loop.sh | /result-dashboard | ループ開始時刻（UTC ISO 8601）。`result-dashboard` がPR/トークン集計の起点として使う |
 
 `current-issue.md` の構造：
 ```markdown
@@ -222,3 +224,4 @@ next-action: implement | debug
 | `/review` | `Bash(git diff *)`, `Read`, `Glob`, `Grep`, `Agent`, `Write` |
 | `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Agent`, `Write` |
 | `/issue-update` | `Bash(gh issue create *)`, `Bash(gh issue list *)`, `Bash(gh issue view *)`, `Read`, `Write` |
+| `/result-dashboard` | `Read`, `Write`, `Bash(python3 *)`, `Bash(gh pr view *)`, `Bash(gh issue view *)`, `Bash(rm -f .issue-loop/analyze-results.py)` |

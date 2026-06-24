@@ -17,3 +17,6 @@ rm -f .issue-loop/iteration-signal
 rm -f .issue-loop/review-result.md
 rm -f .issue-loop/out-of-scope.md
 rm -f .issue-loop/changes.diff
+
+# 開始時刻を UTC で記録（result-dashboard での集計に使用）
+date -u -Iseconds > .issue-loop/start-time
