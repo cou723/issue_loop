@@ -104,9 +104,13 @@ flowchart TD
 number: 123
 title: "Issue title"
 type: Feature | Debug | Refactor | Test
+labels: bug enhancement
+milestone: v1.0
 ---
-Issueの本文・追加収集情報
+Issueの本文・コメント・追加収集情報
 ```
+
+本文・コメントは `/pickIssue` が `gh issue view --template` の出力をそのままファイルへ書き出す（LLM に転記させると要約・欠落が起きるため）。`type` は後段の `/pattern` が埋める。
 
 `review-result.md` の構造：
 ```markdown

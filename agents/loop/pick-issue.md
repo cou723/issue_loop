@@ -19,7 +19,7 @@ hooks:
 
 ## 手順
 
-1. `gh issue list --state open --limit 50 --json number,title,body,labels,milestone` で Issue 一覧取得
+1. `gh issue list --state open --limit 50 --json number,title,body,labels,milestone` で Issue 一覧取得（選定の判断材料。本文はここでは依存関係・価値の推定にのみ使い、書き出しには使わない）
 2. `gh pr list --state open --json number,title,headRefName` で既存 PR 一覧取得
 3. `.issue-loop/pr-context.md` を読み、マージ済み PR 一覧を把握する（ファイルが存在しない場合はマージ済みPRなしとして処理を続行する）
 4. `.issue-loop/issue-selection-comment.md` が存在する場合は読み、ユーザーが指定した選定基準を把握する
@@ -34,7 +34,9 @@ hooks:
 
 ## 出力
 
-Issue が**見つからない**場合、`.issue-loop/current-issue.md` に以下を書く:
+### Issue が見つからない場合
+
+`.issue-loop/current-issue.md` に以下を Write する:
 
 ```
 ---
@@ -44,18 +46,25 @@ type: ""
 ---
 ```
 
-Issue が**見つかった**場合、`gh issue view <番号> --json body,comments` で Issue 本文とコメント一覧を取得し、`.issue-loop/current-issue.md` に以下を書く:
+### Issue が見つかった場合
 
-```
----
-number: <番号>
-title: "<タイトル>"
+**本文・コメントの転記を LLM に行わせない**。Issue 本文を自分で書き写すと、要約・切り詰め・記号崩れによる情報欠落が起きるため、`gh` の出力を**テンプレートでそのままファイルへ書き出す**。選定した Issue 番号を `<番号>` に置換し、以下の1コマンドを Bash で実行する:
+
+```bash
+gh issue view <番号> --json number,title,body,labels,milestone,comments --template '---
+number: {{.number}}
+title: {{printf "%q" .title}}
 type: ""
+labels: {{range .labels}}{{.name}} {{end}}
+milestone: {{if .milestone}}{{.milestone.title}}{{end}}
 ---
 
-<Issueの本文>
-
+{{.body}}
+{{if .comments}}
 ## コメント
-
-<各コメントを「**@<author>**: <body>」の形式で列挙。コメントがない場合はこのセクションごと省略>
+{{range .comments}}
+**@{{.author.login}}**: {{.body}}
+{{end}}{{end}}' > .issue-loop/current-issue.md
 ```
+
+**重要**: 本文・コメントを Write ツールで手書きしてはならない（情報欠落の原因になる）。Write で書き出すのは `NO_ISSUE` の場合のみ。
