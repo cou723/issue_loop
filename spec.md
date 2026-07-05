@@ -7,9 +7,9 @@ Claude Code をはじめとするコーディングエージェントで動く�
 ### Skills（Claudeへの命令スキル）
 
 - **`/issueloop`**：ループのオーケストレーター。セットアップ・ループ制御・各サブエージェントの呼び出しをすべて担う
-- **`/push-and-pr`**：コミット・プッシュ・PR作成を一括実行する（`commit-commands:commit-push-pr` を流用）
+- **`/push-and-pr`**：コミット・プッシュ・PR作成を一括実行する（`commit-commands:commit-push-pr` を流用）。フロントエンドの変更があり開発サーバーが起動している場合は、スクリーンショットを撮影して PR コメントに添付する。監視パスとURLは `.claude/issue-loop.local.md` で設定可能
 - **`/cancel`**：実行中のループを中断する
-- **`/close-issues [N]`**：最新N件のマージ済みPRを対象に、関連するオープンIssueを一括クローズする。各(PR, Issue)ペアの判定は `pr-resolves-issue` エージェントへ委譲する
+- **`/close-issues [N]`**：最新N件のマージ済みPRを対象に、関連するオープンIssueを一括クローズする。番号言及・ブランチ名・タイトル類似で候補ペアを絞り込んでから、各(PR, Issue)ペアの判定を `pr-resolves-issue` エージェントへ委譲して並列起動する
 
 ### Agents（コンテキストを分離して実行するサブエージェント）
 
@@ -20,7 +20,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 - **`pattern`**：Issue のタイプを `Feature` / `Debug` / `Refactor` / `Test` に分類し、結果をファイルに書き出す
 - **`implement`**：実装を行う。`feature-dev:code-explorer` で調査し、実装後に `pr-review-toolkit:code-simplifier` でコードを整理する。最後にスコープ外の発見事項を書き出す
 - **`debug`**：デバッグを行う。`feature-dev:code-explorer` で根本原因を特定し、修正を実装する。最後にスコープ外の発見事項を書き出す
-- **`review`**：7つの専門エージェントを並列実行して変更内容をレビューする。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
+- **`review`**：まず `.issue-loop/ci.sh`（存在する場合）を実行し、失敗なら即 `fail` とする。CI 通過後、必須レビュワー3種を常に、オプショナルレビュワー4種を Issue・変更内容に応じて自律選択して並列実行する。各エージェントの指摘を「スコープ内」と「スコープ外」に分類し、`review-result.md` に書き出す
 - **`issue-update`**：`implement` や `debug` が書き出したスコープ外の発見事項を統合・整理したうえで既存 Issue と照合し、重複のない新規 Issue を登録する
 - **`pr-resolves-issue`**：PR番号とIssue番号を受け取り、そのPRがIssueを解決しているかを `yes`/`no` で `.issue-loop/close-check/pr<N>-issue<M>.txt` に書き出す。`/close-issues` から各ペアに対して並列で呼ばれる
 - **`result-dashboard`**：ループ終了後に自動的に呼ばれ、今回の実行結果を集計・表示する。`gh pr list` で作成PRを取得し、Claude Code の JSONL ログを Python で解析してトークン使用量を集計する
@@ -97,6 +97,8 @@ flowchart TD
 | `iteration-signal` | /iteration | /issueloop | イテレーション結果（`DONE`/`NO_ISSUE`/`CANCELLED`/`NEEDS_INPUT`/`FAILED`）。起動前にオーケストレーターが削除する |
 | `cancel-requested` | /cancel | /issueloop, /iteration | キャンセル要求フラグ（存在＝要求あり） |
 | `start-time` | setup-issue-loop.sh | /result-dashboard | ループ開始時刻（UTC ISO 8601）。`result-dashboard` がPR/トークン集計の起点として使う |
+| `changes.diff` | /review（PreToolUse フック） | 各レビュワー | `git add -A` 済み状態から生成する正準差分。全レビュワーが共通で参照する |
+| `ci.sh` | /issueloop（初回セットアップ時） | /review | プロジェクトのビルドシステムから生成した lint / test 実行スクリプト |
 
 `current-issue.md` の構造：
 ```markdown
@@ -185,19 +187,21 @@ next-action: implement | debug
 
 ## /review の詳細設計
 
-複数の専門エージェントを並列実行し、それぞれの結果を集約する。
+まず CI（`.issue-loop/ci.sh`。`/issueloop` がセットアップ時にプロジェクトのビルドシステムから生成する）を実行し、失敗した場合はレビュワーを起動せず即 `fail` を書き出す。CI 通過後、専門エージェントを並列実行し、それぞれの結果を集約する。
 
 ### レビューエージェント一覧
 
-| エージェント | 観点 | 流用元 |
-|---|---|---|
-| comment-reviewer | コメントの妥当性。ファイル冒頭以外では「Why」のみを書く方針に沿っているか | `pr-review-toolkit:comment-analyzer` |
-| design-reviewer | 既存設計との整合性・設計の妥当性（将来の肥大化リスク・過剰抽象化がないか） | 独自実装 |
-| type-safety-reviewer | TypeScript の `as` 使用箇所の妥当性、lint/型チェッカー抑制コメントの理由が正当か | 独自実装 |
-| security-reviewer | セキュリティ上の問題がないか（OWASP Top 10 相当） | 独自実装 |
-| test-reviewer | 既存テストへの影響、新しいロジックに対応するテストが存在するか | `pr-review-toolkit:pr-test-analyzer` |
-| error-handling-reviewer | 例外の握りつぶし・silent failures がないか | `pr-review-toolkit:silent-failure-hunter` |
-| performance-reviewer | 明らかな非効率（N+1 クエリ・不要なループなど）がないか | 独自実装 |
+必須レビュワーは常に実行する。オプショナルレビュワーは、オーケストレーターが Issue のタイトル・ラベルと変更ファイルの種類から実行要否を判断する。
+
+| エージェント | 区分 | 観点 | 流用元 |
+|---|---|---|---|
+| type-safety-reviewer | 必須 | TypeScript の `as` 使用箇所の妥当性、lint/型チェッカー抑制コメントの理由が正当か | 独自実装 |
+| security-reviewer | 必須 | セキュリティ上の問題がないか（OWASP Top 10 相当） | 独自実装 |
+| error-handling-reviewer | 必須 | 例外の握りつぶし・silent failures がないか | `pr-review-toolkit:silent-failure-hunter` |
+| comment-reviewer | オプショナル | コメントの妥当性。ファイル冒頭以外では「Why」のみを書く方針に沿っているか | `pr-review-toolkit:comment-analyzer` |
+| design-reviewer | オプショナル | 既存設計との整合性・設計の妥当性（将来の肥大化リスク・過剰抽象化がないか） | 独自実装 |
+| test-reviewer | オプショナル | 既存テストへの影響、新しいロジックに対応するテストが存在するか | `pr-review-toolkit:pr-test-analyzer` |
+| performance-reviewer | オプショナル | 明らかな非効率（N+1 クエリ・不要なループなど）がないか | 独自実装 |
 
 ### 共通レビュー契約（関心の分離）
 
@@ -216,16 +220,6 @@ next-action: implement | debug
 
 ## 権限設計
 
-各コンポーネントの `allowed-tools` フロントマター案。
+必要最小限のツールのみを許可する方針を取る。各コンポーネントの許可ツールは、コマンドは `allowed-tools`、エージェントは `tools` のフロントマターを正とする（本ドキュメントには列挙しない。二重管理による乖離を防ぐため）。
 
-| コンポーネント | 主要な allowed-tools |
-|---|---|
-| `/issueloop` | `Bash(bash *setup-issue-loop.sh)`, `Bash(test -f .issue-loop/cancel-requested)`, `Bash(test -f .issue-loop/ci.sh)`, `Bash(chmod +x .issue-loop/ci.sh)`, `Bash(rm -f .issue-loop/iteration-signal)`, `Bash(rm -f .issue-loop/questions.md)`, `Bash(rm -f .issue-loop/answers.md)`, `Bash(rm -f .issue-loop/issue-selection-comment.md)`, `Bash(grep * .issue-loop/iteration-signal)`, `Bash(git branch *)`, `Bash(gh pr list *)`, `Agent`, `AskUserQuestion`, `Read`, `Write` |
-| `/pr-sync` | `Bash(gh pr list *)`, `Bash(gh pr view *)`, `Bash(gh issue create *)`, `Bash(gh pr comment *)`, `Read`, `Write` |
-| `/pickIssue` | `Bash(gh issue list *)`, `Bash(gh issue view *)`, `Bash(gh pr list *)`, `Read`, `Write` |
-| `/infoGathering` | `Bash(gh issue comment *)`, `Bash(gh issue view *)`, `Read`, `Write` |
-| `/pattern` | `Read`, `Write` |
-| `/review` | `Bash(git diff *)`, `Read`, `Glob`, `Grep`, `Agent`, `Write` |
-| `/debug` | `Bash`, `Read`, `Grep`, `Glob`, `Agent`, `Write` |
-| `/issue-update` | `Bash(gh issue create *)`, `Bash(gh issue list *)`, `Bash(gh issue view *)`, `Read`, `Write` |
-| `/result-dashboard` | `Read`, `Write`, `Bash(python3 *)`, `Bash(gh pr view *)`, `Bash(gh issue view *)`, `Bash(rm -f .issue-loop/analyze-results.py)` |
+利用者がプロジェクト側の `settings.local.json` に設定すべき推奨パーミッションは README に記載する。

@@ -15,7 +15,7 @@ Read ツールで `.issue-loop/start-time` を読む。存在しない場合は�
 Write ツールで `.issue-loop/analyze-results.py` に以下の Python スクリプトを書き込む（`<START_TIME>` を実際の start-time の値に置換すること）:
 
 ```python
-import json, os, glob, subprocess, sys
+import json, os, glob, re, subprocess, sys
 from datetime import datetime, timezone
 
 START_TIME = "<START_TIME>"
@@ -53,8 +53,10 @@ for pr in prs:
         pr["issueTitle"] = ""
 
 # トークン集計（プロジェクトの JSONL ログを start-time 以降でフィルタ）
+# Claude Code のプロジェクトディレクトリ名はパスの英数字・ハイフン以外を "-" に置換したもの
+# （"/" だけでなく "." や "_" も変換される。例: github.com → github-com）
 cwd = os.getcwd()
-slug = cwd.replace("/", "-")
+slug = re.sub(r"[^A-Za-z0-9-]", "-", cwd)
 log_dir = os.path.expanduser(f"~/.claude/projects/{slug}/")
 
 total_input = total_output = total_cache_creation = total_cache_read = 0

@@ -50,7 +50,7 @@ git add -A && git diff HEAD -- . > .issue-loop/changes.diff
 
 CI が失敗した（終了コードが 0 以外）場合、`next-action` を `.issue-loop/next-action.md` から読み取り、直ちに `.issue-loop/review-result.md` を以下の内容で書き出して終了する:
 
-```
+````
 ---
 status: fail
 next-action: <next-action.md の値、読めない場合は implement>
@@ -62,7 +62,7 @@ next-action: <next-action.md の値、読めない場合は implement>
   ```
 
 ## スコープ外の指摘（Issue 登録対象）
-```
+````
 
 ## ステップ 1: レビュー計画
 

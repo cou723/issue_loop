@@ -1,7 +1,7 @@
 ---
 name: iteration
 description: issue-loopの1イテレーション（PR同期→Issue選定→実装→レビュー→PR作成）を全て実行する。メインセッションから各イテレーションで呼ばれる。
-tools: Read, Bash(bash *), Bash(git checkout -b *), Bash(git checkout main), Bash(git pull *), Bash(git branch *), Bash(rm -f .issue-loop/out-of-scope.md), Bash(rm -f .issue-loop/review-result.md), Bash(rm -f .issue-loop/pr-context.md), Bash(rm -f .issue-loop/current-issue.md), Bash(rm -f .issue-loop/next-action.md), Bash(test -f .issue-loop/cancel-requested), Bash(test -f .issue-loop/questions.md), Bash(gh pr list *), Bash(gh pr comment *), Agent, Skill, Write
+tools: Read, Bash(bash *), Bash(git checkout -b *), Bash(git checkout main), Bash(git pull *), Bash(git branch *), Bash(rm -f .issue-loop/out-of-scope.md), Bash(rm -f .issue-loop/review-result.md), Bash(rm -f .issue-loop/pr-context.md), Bash(rm -f .issue-loop/current-issue.md), Bash(rm -f .issue-loop/next-action.md), Bash(rm -f .issue-loop/changes.diff), Bash(test -f .issue-loop/cancel-requested), Bash(test -f .issue-loop/questions.md), Bash(gh pr list *), Bash(gh pr comment *), Agent, Skill, Write
 hooks:
   Stop:
     - hooks:
