@@ -27,6 +27,20 @@ dynamic workflow ランタイム（Claude Code v2.1.154+、research preview）�
 - workflow 内エージェントで Skill ツール・MCP ツール（Playwright 等）が使えるか（`push-and-pr.md` の流用に影響。スクリプト側に gh 直接実行のフォールバック指示あり）
 - `resumeFromRunId` は同一セッション内のみ有効
 
+## 静的チェック
+
+ランタイムは実行時に構文チェックのみ行い、`agent` / `pipeline` 等のグローバル未定義や
+タイポは実行するまで検出できない。`check.mjs` は `tsc --checkJs` でその隙間を埋める
+（初回のみ `cd workflows && npm install` が必要）。
+
+```bash
+node workflows/check.mjs workflows/iteration.js
+```
+
+検出できるのはグローバル未定義・構文エラーなど機械的なものに限られる。`agent()` の
+戻り値の型は `any` のままなので、schema と実際に参照するプロパティ名の不整合（例:
+`picked.number` のタイポ）までは検出しない。
+
 ## 試し方
 
 1. `scripts/deploy-local.sh` などでこのブランチのプラグインをローカル環境に反映する

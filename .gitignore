@@ -2,3 +2,5 @@
 .screenshots/
 .issue-loop.local.md
 .issue-loop/
+workflows/node_modules/
+workflows/.check-tmp/
