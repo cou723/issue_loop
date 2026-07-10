@@ -43,6 +43,6 @@ node workflows/check.mjs workflows/iteration.js
 
 ## 試し方
 
-1. `scripts/deploy-local.sh` などでこのブランチのプラグインをローカル環境に反映する
+1. `ln -s "$(pwd)" ~/.claude/skills/issue-loop` などでこのブランチのプラグインをローカル環境に反映する（[CLAUDE.md](../CLAUDE.md) 参照）
 2. Issue のあるテスト用リポジトリで `/issue-loop:issueloop-wf -mi 1` を実行する
 3. `/workflows` で進行を確認し、従来版（`/issue-loop:issueloop`）と信頼性・トークン消費を比較する

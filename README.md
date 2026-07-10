@@ -20,15 +20,15 @@ GitHub Issue ベースの自動開発ループを実現する Claude Code プラ
 
 ### プラグインのインストール
 
-Claude Code のマーケットプレイスからインストールするか、開発中はローカルデプロイスクリプトを使用する。
+Claude Code のマーケットプレイスからインストールするか、開発中は skills-directory plugin として直接読み込ませる。
 
-**ローカル開発用**（`my-room` で `/install-plugin` 実行済みの場合）:
+**ローカル開発用**:
 
 ```bash
-bash scripts/deploy-local.sh
+ln -s "$(pwd)" ~/.claude/skills/issue-loop
 ```
 
-このスクリプトはプラグインキャッシュへの同期と `installed_plugins.json` の更新を行う。
+`.claude-plugin/plugin.json` を持つディレクトリを `~/.claude/skills/` にシンボリックリンクすると、キャッシュへのコピーなしにリポジトリを直接 `issue-loop@skills-dir` として読み込む。詳細は [CLAUDE.md](./CLAUDE.md) を参照。
 
 ## 使い方
 
