@@ -19,6 +19,10 @@ prompt からパラメータを読み取る:
 - `MAX_REVIEW_ITERATIONS` = 指定された値（デフォルト: 3）
 - `RESUME` = 指定された値（デフォルト: false）。ユーザーへの質問後にメインセッションから再開された場合に true
 
+## サブエージェント実行の規約
+
+サブエージェント（Agent ツール）は必ず**同期**（`run_in_background: false`）で起動し、結果を受け取ってから次のステップへ進む。バックグラウンドで起動して `sleep`・`until` ループ・no-op コマンド（`echo` 等）の連発で完了を待ってはならない（ビジーウェイトはトークンを浪費し、完了検知も不確実になる）。
+
 ## 終了シグナルの規約
 
 このエージェントは終了時に必ず `.issue-loop/iteration-signal` へ次のいずれかを書き出す:
@@ -107,9 +111,11 @@ Read ツールで `.issue-loop/next-action.md` を読む。
 
 ### b. レビュー
 
+review_count > 0（2回目以降）の場合、削除する前に直前の `.issue-loop/review-result.md` のスコープ内指摘を要約して控えておく。
+
 前回の遺物を削除する: `rm -f .issue-loop/review-result.md`
 
-Agent ツールで `issue-loop:review:review` サブエージェントを起動する。
+Agent ツールで `issue-loop:review:review` サブエージェントを起動する。review_count > 0 の場合は prompt に「これは <review_count + 1> 回目のレビューである。前回のスコープ内指摘: <控えた要約>」を必ず含める（review エージェントはこれを合図に再レビューの収束規律で判定する）。
 
 ### c. 結果確認
 

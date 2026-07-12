@@ -1,7 +1,7 @@
 ---
 description: "GitHub Issue を自動的に選定・実装・レビュー・PR作成まで繰り返し処理する自動開発ループを開始する。ユーザーが「issue loop を開始して」「未対応の Issue を自動で片付けて」「次の Issue に取り組んで」などと依頼した場合に呼び出される"
 argument-hint: "[-mi N] [--max-iterations N] [--max-review-iterations N] [--comment TEXT, -c TEXT] [-h, --help]"
-allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Bash(grep * .issue-loop/iteration-signal)", "Bash(git branch *)", "Bash(gh pr list *)", "Agent", "AskUserQuestion", "Read", "Write"]
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Bash(grep * .issue-loop/iteration-signal)", "Bash(git branch *)", "Bash(gh pr list *)", "Agent", "AskUserQuestion", "Read", "Write", "ScheduleWakeup"]
 ---
 
 # Issue Loop
@@ -32,6 +32,19 @@ STOPPING:
 ```
 
 このループは**有人実行**を前提とする。Issue の情報が不足している場合は、ループを止めてユーザーへ質問し（後述の `NEEDS_INPUT` 処理）、回答を得てから実装を進める。
+
+## 多重起動ガード
+
+開始時、同一セッションで起動したイテレーションが未完了のまま実行中であることが文脈から分かる場合は、新規ループを開始せず既存イテレーションの完了待ちに戻る。
+
+## サブエージェント待機の規約
+
+`issue-loop:iteration` サブエージェントはバックグラウンドで実行される。起動したら完了通知（task-notification）を待って turn を終え、通知を受けてからシグナル確認に進む。
+
+完了通知が届かない場合のフォールバックとして ScheduleWakeup を予約してよい（1200秒以上）。その際:
+
+- prompt に**このコマンド（`/issue-loop:issueloop`）を渡してはならない**。wakeup 発火でコマンドが再入力されると、ユーザーの新規依頼と区別がつかず、完了済みループの後に依頼されていない新規ループを開始する事故につながる
+- 代わりに次の趣旨のテキストを prompt に渡す: 「issue-loop のフォールバック wakeup。`.issue-loop/iteration-signal` を確認し、シグナルがあればシグナル確認処理へ進む。未作成（実行中）なら再度フォールバック wakeup を予約して待機を続ける。ループが既に終了している場合は ScheduleWakeup を `stop: true` で呼んで終了する。**新規ループを開始してはならない**」
 
 ## セットアップ
 
@@ -105,6 +118,8 @@ iteration = 1 から始め MAX_ITERATIONS 回を上限に以下を繰り返す�
 Agent ツールで `issue-loop:iteration` サブエージェントを起動する。
 - prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = false"
 
+起動後は「サブエージェント待機の規約」に従って完了通知を待つ。
+
 ---
 
 ### シグナル確認
@@ -136,6 +151,7 @@ Agent ツールで `issue-loop:iteration` サブエージェントを起動す�
 6. Agent ツールで `issue-loop:iteration` サブエージェントを**再起動**する。
    - prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = true"
    - **iteration カウントは増やさない**（同じ Issue の続きを実行するため）
+   - 起動後は「サブエージェント待機の規約」に従って完了通知を待つ
 
 `answers.md` の形式:
 
@@ -157,11 +173,12 @@ issue: <number>
 
 ## ループ終了後
 
-以下を表示する:
+1. フォールバック wakeup を予約していた場合は、ScheduleWakeup を `stop: true` で呼んで**必ず停止する**（完了後の再発火が依頼されていない新規ループを開始する事故を防ぐ）
+2. 以下を表示する:
 
 ```
 🏁 Issue loop が完了しました。
   実行イテレーション数: <完了したイテレーション数>
 ```
 
-Agent ツールで `issue-loop:result-dashboard` サブエージェントを起動し、今回の実行結果ダッシュボードを表示する。
+3. Agent ツールで `issue-loop:result-dashboard` サブエージェントを**同期**（`run_in_background: false`）で起動し、今回の実行結果ダッシュボードを表示する（バックグラウンド起動して wakeup で完了を待ってはならない）。

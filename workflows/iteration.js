@@ -4,7 +4,7 @@ export const meta = {
     'issue-loop の1イテレーション（PR同期→Issue選定→情報収集→分類→実装/レビュー→PR作成）を実行し、結果を構造化して返す',
 }
 
-// args:
+// args（JSON オブジェクトとして渡す前提。JSON 文字列で渡してはならない）:
 //   pluginRoot: issue-loop プラグインのルート絶対パス（エージェントが指示ファイルを参照するために使う）
 //   maxReviewIterations: 実装/レビューの最大反復回数（デフォルト: 3）
 //   answers: NEEDS_INPUT 後の再実行時のみ。[{ question, answer }] の配列
@@ -14,16 +14,50 @@ export const meta = {
 // （従来の .issue-loop/iteration-signal ファイルの代替。CANCELLED は廃止し、
 //   実行中の中断は /workflows ビューの停止操作に委ねる）
 
-const pluginRoot = args.pluginRoot
-const maxReviewIterations = args.maxReviewIterations ?? 3
-const answers = args.answers ?? null
+// args の正規化。メインセッションが誤って JSON 文字列として渡した場合は
+// parse で救済するが、parse 失敗は握りつぶさず FAILED として即終了する。
+let normalizedArgs = args
+if (typeof normalizedArgs === 'string') {
+  try {
+    normalizedArgs = JSON.parse(normalizedArgs)
+  } catch (e) {
+    return {
+      signal: 'FAILED',
+      reason:
+        'args を JSON オブジェクトとしてパースできませんでした。args は JSON 文字列ではなく JSON オブジェクトとして渡してください: ' +
+        String((e && e.message) || e),
+    }
+  }
+}
+if (typeof normalizedArgs !== 'object' || normalizedArgs === null) {
+  return {
+    signal: 'FAILED',
+    reason:
+      'args が JSON オブジェクトではありません。args は JSON オブジェクトとして渡してください。',
+  }
+}
+
+const pluginRoot = normalizedArgs.pluginRoot
+const maxReviewIterations = normalizedArgs.maxReviewIterations ?? 3
+const answers = normalizedArgs.answers ?? null
+
+// pluginRoot が無いとサブエージェントのプロンプトに壊れたパスが埋め込まれるため、
+// エージェントを1つも起動する前に即終了する。
+if (typeof pluginRoot !== 'string' || pluginRoot.length === 0) {
+  return {
+    signal: 'FAILED',
+    reason:
+      'pluginRoot が指定されていません。args は JSON オブジェクトとして渡し（JSON 文字列に変換して渡してはならない）、pluginRoot にプラグインのルート絶対パスを含めてください。',
+  }
+}
 
 // 既存のエージェント定義（Markdown）を指示書として流用するための共通前置き。
 // frontmatter の tools / hooks はワークフロー実行では適用されないため本文のみ従わせる
 const followFile = (path) =>
   `Read ツールで ${path} を読み、frontmatter を除く本文の指示に従って作業してください。` +
   `本文中の \${CLAUDE_PLUGIN_ROOT} は ${pluginRoot} に読み替えてください。` +
-  `ユーザーへの質問・確認はできません。自律的に判断してください。\n`
+  `ユーザーへの質問・確認はできません。自律的に判断してください。` +
+  `指定されたパスのファイルが読めない場合は、ファイルシステムの探索や代替パスの推測を行わず、その旨を最終メッセージで報告して作業を終了してください。\n`
 
 try {
   // ── ステップ 1: PR同期 ──────────────────────────────

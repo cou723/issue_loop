@@ -11,7 +11,7 @@ allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/can
 従来版との違い:
 
 - `.issue-loop/iteration-signal` などのシグナルファイルは使わない。イテレーションの結果は workflow の構造化リターン（`signal` フィールド）で受け取る
-- `NEEDS_INPUT` 後の再開は `resumeFromRunId` で行う（完了済みステップはランタイムのキャッシュが返るため、RESUME フラグやステップスキップの規約は不要）
+- `NEEDS_INPUT` 後の再開は `resumeFromRunId` で行う（完了済みステップはランタイムのキャッシュが返るため、RESUME フラグやステップスキップの規約は不要）。ただしキャッシュは workflow を起動したセッション内でのみ有効で、セッション再起動を挟んで `resumeFromRunId` を渡した場合は完了済みステップも再実行される（正常に完走はする）
 - 実行中のイテレーションの中断は `/workflows` ビューの停止操作で行う（イテレーション間の中断は従来どおり `/issue-loop:cancel`）
 
 ## 引数の解釈
@@ -62,7 +62,7 @@ iteration = 1 から始め MAX_ITERATIONS 回を上限に以下を繰り返す�
 Workflow ツールを以下の入力で起動し、実行完了まで待つ:
 
 - `scriptPath`: `"${CLAUDE_PLUGIN_ROOT}/workflows/iteration.js"`
-- `args`: `{ "pluginRoot": "<CLAUDE_PLUGIN_ROOT の実パス>", "maxReviewIterations": <MAX_REVIEW_ITERATIONS>, "answers": null }`
+- `args`: `{ "pluginRoot": "<CLAUDE_PLUGIN_ROOT の実パス>", "maxReviewIterations": <MAX_REVIEW_ITERATIONS>, "answers": null }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない。`pluginRoot` が解決できない場合、workflow はエージェントを起動せず即 `FAILED` を返す）
 
 ### 3. 結果確認
 
@@ -83,8 +83,9 @@ workflow は AskUserQuestion を使えないため、質問はこのメインセ
 3. Workflow ツールを**再起動**する:
    - `scriptPath`: 同じ
    - `resumeFromRunId`: 直前の run の ID
-   - `args`: `{ "pluginRoot": <同じ>, "maxReviewIterations": <同じ>, "answers": [{ "question": "<質問文>", "answer": "<ユーザーの回答>" }, ...] }`
-   - **iteration カウントは増やさない**（同じ Issue の続きを実行するため。PR同期・Issue選定はキャッシュから返り、情報収集以降が再実行される）
+   - `args`: `{ "pluginRoot": <同じ>, "maxReviewIterations": <同じ>, "answers": [{ "question": "<質問文>", "answer": "<ユーザーの回答>" }, ...] }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない）
+   - **iteration カウントは増やさない**（同じ Issue の続きを実行するため）
+   - キャッシュは workflow を起動したセッション内でのみ有効。同一セッションで再開する場合は PR同期・Issue選定がキャッシュから返り情報収集以降が再実行されるが、セッション再起動（中断からの再開など）を挟んで `resumeFromRunId` を渡した場合は完了済みステップも再実行される（動作自体は正常に完走する）
 4. 完了後、再度「3. 結果確認」を行う
 
 ## ループ終了後
