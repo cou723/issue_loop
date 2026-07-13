@@ -100,7 +100,7 @@ flowchart TD
 | `cancel-requested` | /cancel | /issueloop, /iteration | キャンセル要求フラグ（存在＝要求あり） |
 | `start-time` | setup-issue-loop.sh | /result-dashboard | ループ開始時刻（UTC ISO 8601）。`result-dashboard` がPR/トークン集計の起点として使う |
 | `changes.diff` | /review（PreToolUse フック） | 各レビュワー | `git add -A` 済み状態から生成する正準差分。全レビュワーが共通で参照する |
-| `ci.sh` | /issueloop（初回セットアップ時） | /review | プロジェクトのビルドシステムから生成した lint / test 実行スクリプト |
+| `ci.sh` | /issueloop（初回セットアップ時） | /review | リモート CI のチェックをローカル再現するスクリプト。CI 定義（`.github/workflows/`）から転記して生成し、ない場合のみビルドシステムから推測する |
 
 `current-issue.md` の構造：
 ```markdown
@@ -189,7 +189,7 @@ next-action: implement | debug
 
 ## /review の詳細設計
 
-まず CI（`.issue-loop/ci.sh`。`/issueloop` がセットアップ時にプロジェクトのビルドシステムから生成する）を実行し、失敗した場合はレビュワーを起動せず即 `fail` を書き出す。CI 通過後、専門エージェントを並列実行し、それぞれの結果を集約する。
+まず CI（`.issue-loop/ci.sh`。`/issueloop` がセットアップ時にリモート CI 定義から転記して生成する）を実行し、失敗した場合はレビュワーを起動せず即 `fail` を書き出す。CI 通過後、専門エージェントを並列実行し、それぞれの結果を集約する。
 
 ### レビューエージェント一覧
 

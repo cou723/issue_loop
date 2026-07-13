@@ -66,6 +66,18 @@ STOPPING:
 
 `test -f .issue-loop/ci.sh` を実行し、ファイルが**存在しない場合のみ**以下を行う。
 
+ci.sh はリモート CI が実行するチェックのローカル再現である。ci.sh がリモート CI より緩いと、ループ内のレビューを通過したのにリモート CI で落ちる PR が生まれる。したがって CI 定義が存在する場合は、推測せず定義から転記する。
+
+**手順1: CI 定義からの転記（優先）**
+
+`.github/workflows/` 配下の YAML を Read で確認する。push / pull_request でトリガーされる workflow があれば、そのジョブの `run` ステップから検証コマンド（lint / format / typecheck / test / build 等）を抽出し、実行コマンドをそのまま ci.sh に転記する。以下は除外する:
+
+- セットアップ系（checkout、ランタイムのインストール、依存インストール、キャッシュ）
+- デプロイ・リリース・通知系
+- CI 環境でしか実行できないもの（シークレット必須、matrix 固有など）
+
+**手順2: ビルドシステムからの推測（CI 定義がない場合のみ）**
+
 以下のファイルを Read で確認し、このプロジェクトのビルドシステムと使用可能なCIコマンドを判断する:
 
 - `package.json`（lint / format / test スクリプトの有無）
@@ -75,9 +87,9 @@ STOPPING:
 - `go.mod`（Go: `go vet`, `go test ./...`）
 - `pom.xml` / `build.gradle`（Java / Kotlin: maven / gradle）
 
-判断したCIコマンドを組み合わせた `.issue-loop/ci.sh` を Write で生成する（全チェックが通る場合のみ終了コード 0 を返す構成にする）。その後 `chmod +x .issue-loop/ci.sh` を実行する。
+いずれの手順でも、判断したCIコマンドを組み合わせた `.issue-loop/ci.sh` を Write で生成する（全チェックが通る場合のみ終了コード 0 を返す構成にする）。その後 `chmod +x .issue-loop/ci.sh` を実行する。
 
-ビルドシステムが判断できない場合は、`.issue-loop/ci.sh` を生成せずスキップする。
+どちらの手順でも判断できない場合は、`.issue-loop/ci.sh` を生成せずスキップする。
 
 ## 開始メッセージ
 

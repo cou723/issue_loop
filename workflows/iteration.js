@@ -6,7 +6,8 @@ export const meta = {
 
 // args（JSON オブジェクトとして渡す前提。JSON 文字列で渡してはならない）:
 //   pluginRoot: issue-loop プラグインのルート絶対パス（エージェントが指示ファイルを参照するために使う）
-//   maxReviewIterations: 実装/レビューの最大反復回数（デフォルト: 3）
+//   maxReviewIterations: 実装/レビューの最大反復回数（デフォルト: 3）。
+//     再ラウンドは CRITICAL/HIGH 指摘か CI 失敗があった場合のみ発生する
 //   answers: NEEDS_INPUT 後の再実行時のみ。[{ question, answer }] の配列
 //
 // 戻り値は必ず { signal, ... } の形を取る:
@@ -59,30 +60,53 @@ const followFile = (path) =>
   `ユーザーへの質問・確認はできません。自律的に判断してください。` +
   `指定されたパスのファイルが読めない場合は、ファイルシステムの探索や代替パスの推測を行わず、その旨を最終メッセージで報告して作業を終了してください。\n`
 
+// モデルルーティング: セッションデフォルト（最上位モデル）を継承させず、
+// 定型・レビュー系は sonnet、思考力が必要な実装・デバッグのみ opus を使う。
+// 機械的判定（情報収集・Issue分類）は従来どおり各呼び出しで haiku を指定する
+const BASE_MODEL = 'sonnet'
+const HEAVY_MODEL = 'opus'
+
+// agent() はユーザーによるスキップや API エラー（セッションリミット等）で null を
+// 返すことがある。結果を参照するステップは null をここで検知し、外側の catch 経由で
+// FAILED シグナルとして畳む
+const must = (result, step) => {
+  if (result == null) {
+    throw new Error(
+      `${step} エージェントが結果を返しませんでした（スキップまたは API エラーの可能性）`,
+    )
+  }
+  return result
+}
+
 try {
   // ── ステップ 1: PR同期 ──────────────────────────────
   await agent(followFile(`${pluginRoot}/agents/loop/pr-sync.md`), {
     label: 'PR同期',
+    model: BASE_MODEL,
   })
 
   // ── ステップ 2: Issue選定 ────────────────────────────
   // current-issue.md の書き出しは従来どおり行わせつつ（後続エージェントが読む）、
   // 制御フロー用の判定はファイルではなく構造化リターンで受け取る
-  const picked = await agent(
-    followFile(`${pluginRoot}/agents/loop/pick-issue.md`) +
-      '作業完了後、選定結果を JSON で返してください。取り組む Issue がない場合は found: false とします。',
-    {
-      label: 'Issue選定',
-      schema: {
-        type: 'object',
-        required: ['found'],
-        properties: {
-          found: { type: 'boolean' },
-          number: { type: 'number' },
-          title: { type: 'string' },
+  const picked = must(
+    await agent(
+      followFile(`${pluginRoot}/agents/loop/pick-issue.md`) +
+        '作業完了後、選定結果を JSON で返してください。取り組む Issue がない場合は found: false とします。',
+      {
+        label: 'Issue選定',
+        model: BASE_MODEL,
+        schema: {
+          type: 'object',
+          required: ['found'],
+          properties: {
+            found: { type: 'boolean' },
+            number: { type: 'number' },
+            title: { type: 'string' },
+          },
         },
       },
-    },
+    ),
+    'Issue選定',
   )
 
   if (!picked.found) {
@@ -103,7 +127,7 @@ try {
       'ただし questions.md へのファイル書き出しは行わず、質問の要否と内容を JSON で返してください。' +
       '情報が十分なら needsInput: false、不足があれば needsInput: true と questions を返します。'
 
-  const info = await agent(infoPrompt, {
+  const info = must(await agent(infoPrompt, {
     label: '情報収集',
     model: 'haiku',
     schema: {
@@ -136,7 +160,7 @@ try {
         },
       },
     },
-  })
+  }), '情報収集')
 
   if (info.needsInput) {
     return {
@@ -149,7 +173,7 @@ try {
 
   // ── ステップ 4: Issue分類 ────────────────────────────
   // 従来の next-action.md への書き出しを構造化リターンで置き換える
-  const classified = await agent(
+  const classified = must(await agent(
     `Read ツールで ${pluginRoot}/agents/loop/pattern.md を読み、その分類基準に従って` +
       ' .issue-loop/current-issue.md の Issue を分類してください。' +
       ' frontmatter の type: の更新は指示どおり行いますが、next-action.md は書き出さず、' +
@@ -165,7 +189,7 @@ try {
         },
       },
     },
-  )
+  ), 'Issue分類')
   const nextAction = classified.type === 'Debug' ? 'debug' : 'implement'
 
   // ── ステップ 5: ブランチ作成 ──────────────────────────
@@ -179,6 +203,7 @@ try {
       '完了後、作成したブランチ名を JSON で返してください。',
     {
       label: 'ブランチ作成',
+      model: BASE_MODEL,
       schema: {
         type: 'object',
         required: ['branch'],
@@ -196,7 +221,8 @@ try {
     '（git diff を自分で実行してはならない。やむを得ない場合は必ず git diff HEAD を使う）。' +
     '指摘は2つに分類する: scope_in = この変更で新たに導入された問題（今回修正する）、' +
     'scope_out = 変更が触れた/露出させた既存コードの問題（記録のみ、今回は修正しない）。' +
-    '各指摘は "<重大度 CRITICAL/HIGH/MEDIUM/LOW> — <file>:<line> — <説明と推奨対応>" 形式の文字列とし、JSON で返す。'
+    '各指摘は "<重大度 CRITICAL/HIGH/MEDIUM/LOW> — <file>:<line> — <説明と推奨対応>" 形式の文字列とし、JSON で返す。' +
+    'CRITICAL/HIGH はマージをブロックすべき問題（バグ・脆弱性・データ破壊等）に限って使い、迷う場合は MEDIUM 以下とする。'
 
   const reviewSchema = {
     type: 'object',
@@ -267,81 +293,163 @@ try {
   ]
 
   let reviewPassed = false
-  let findings = [] // 直近レビューの scope_in 指摘（次ラウンドの実装エージェントへ渡す）
+  let findings = [] // 直近ラウンドの CRITICAL/HIGH 指摘（次ラウンドの実装エージェントへ渡す）
+  const minorFindings = new Set() // MEDIUM/LOW の scope_in。再ラウンドせずループ後に1回だけ修正する
   const scopeOut = [] // 全ラウンドの scope_out 指摘（後で Issue 登録する）
+  let activeReviewers = null // 初回のレビュー準備で確定し、以降のラウンドで追加しない
+  let flagged = null // reviewerId -> 前ラウンドの CRITICAL/HIGH 指摘。null はレビュー未完了
+
+  // 再ラウンドのトリガーを CRITICAL/HIGH に限定する。軽微な指摘でフルラウンドを
+  // 回すとレビューが収束せず、消費トークンの大半がこのループに吸われるため
+  const isBlocking = (f) => /^\s*(CRITICAL|HIGH)\b/i.test(String(f))
 
   for (let round = 1; round <= maxReviewIterations; round++) {
-    // a. 実装またはデバッグ
+    // a. 実装またはデバッグ。round 2 以降は再探索させず指摘の解消に限定する
     const workFile = nextAction === 'debug' ? 'debug.md' : 'implement.md'
     await agent(
       followFile(`${pluginRoot}/agents/loop/${workFile}`) +
         '.issue-loop/current-issue.md を読み、Issue に対応してください。' +
         (findings.length > 0
-          ? '\n前回のレビューで以下のスコープ内指摘が出ています。review-result.md は存在しないため、' +
-            'この指摘リストを正として必ず解消してください:\n' +
+          ? '\nこれは前回レビューの指摘対応ラウンドです。Issue の再調査やコードベースの' +
+            '広範な再探索は行わず、git diff HEAD で現在の変更を確認したうえで、以下の指摘の' +
+            '解消のみを行ってください（review-result.md は存在しない。このリストが正）:\n' +
             findings.join('\n')
           : ''),
-      { label: `${nextAction} (round ${round})` },
+      { label: `${nextAction} (round ${round})`, model: HEAVY_MODEL },
     )
 
-    // b. レビュー準備: 差分の確定・CI 実行・オプショナルレビュワーの選定
-    const prep = await agent(
+    // b. レビュー準備: 差分の確定・CI 実行。オプショナルレビュワーの選定は
+    // レビュワーパネル未確定のときだけ行い、以降は固定する（ラウンドごとに
+    // パネルが膨らんで消費が増えるのを防ぐ）
+    const prepCommon =
       '以下を順に実行してください:\n' +
-        '1. git add -A && git diff HEAD -- . > .issue-loop/changes.diff で変更差分を確定する\n' +
-        '2. test -f .issue-loop/ci.sh で CI スクリプトの有無を確認し、存在すれば bash .issue-loop/ci.sh を実行する\n' +
-        '3. .issue-loop/current-issue.md と .issue-loop/changes.diff を読み、以下のオプショナルレビュワーの要否を判断する:\n' +
-        '   - comment: コメント・ドキュメント・JSDoc が変更に含まれる場合\n' +
-        '   - design: 新しいモジュール・クラス・API の追加、または大規模なリファクタリング\n' +
-        '   - test: 新機能追加・バグ修正（再現テストが期待される）の Issue\n' +
-        '   - performance: データ取得・ループ処理・DBクエリ・レンダリングに関わる変更\n' +
-        '結果を JSON で返してください。ciPassed は ci.sh が存在しない場合 true とし、' +
-        'ciOutput は CI 失敗時のみエラー出力の要約を入れます。',
-      {
-        label: `レビュー準備 (round ${round})`,
-        schema: {
-          type: 'object',
-          required: ['ciPassed', 'optionalReviewers'],
-          properties: {
-            ciPassed: { type: 'boolean' },
-            ciOutput: { type: 'string' },
-            optionalReviewers: {
-              type: 'array',
-              items: {
-                type: 'string',
-                enum: ['comment', 'design', 'test', 'performance'],
+      '1. git add -A && git diff HEAD -- . > .issue-loop/changes.diff で変更差分を確定する\n' +
+      '2. test -f .issue-loop/ci.sh で CI スクリプトの有無を確認し、存在すれば bash .issue-loop/ci.sh を実行する\n'
+    const prepTail =
+      '結果を JSON で返してください。ciPassed は ci.sh が存在しない場合 true とし、' +
+      'ciOutput は CI 失敗時のみエラー出力の要約を入れます。'
+    const prep = must(
+      await agent(
+        activeReviewers === null
+          ? prepCommon +
+              '3. .issue-loop/current-issue.md と .issue-loop/changes.diff を読み、以下のオプショナルレビュワーの要否を判断する:\n' +
+              '   - comment: コメント・ドキュメント・JSDoc が変更に含まれる場合\n' +
+              '   - design: 新しいモジュール・クラス・API の追加、または大規模なリファクタリング\n' +
+              '   - test: 新機能追加・バグ修正（再現テストが期待される）の Issue\n' +
+              '   - performance: データ取得・ループ処理・DBクエリ・レンダリングに関わる変更\n' +
+              prepTail
+          : prepCommon + prepTail,
+        {
+          label: `レビュー準備 (round ${round})`,
+          model: BASE_MODEL,
+          schema: {
+            type: 'object',
+            required:
+              activeReviewers === null ? ['ciPassed', 'optionalReviewers'] : ['ciPassed'],
+            properties: {
+              ciPassed: { type: 'boolean' },
+              ciOutput: { type: 'string' },
+              optionalReviewers: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  enum: ['comment', 'design', 'test', 'performance'],
+                },
               },
             },
           },
         },
-      },
+      ),
+      `レビュー準備 (round ${round})`,
     )
 
     if (!prep.ciPassed) {
       findings = [
-        'CI が失敗しました。lint / format / test のエラーを修正してください。\n' +
+        'CRITICAL — CI — CI が失敗しました。lint / format / test のエラーを修正してください。\n' +
           (prep.ciOutput ?? ''),
       ]
       continue
     }
 
-    // c. レビュワーを並列実行し、スクリプト側で集約する
-    const reviewers = reviewerCatalog.filter(
-      (r) => r.always || prep.optionalReviewers.includes(r.id),
-    )
-    const results = await pipeline(reviewers, (r) =>
-      agent(`${r.perspective}\n${reviewContract}`, {
-        label: `${r.label} (round ${round})`,
-        schema: reviewSchema,
-      }),
+    if (activeReviewers === null) {
+      activeReviewers = reviewerCatalog.filter(
+        (r) => r.always || (prep.optionalReviewers ?? []).includes(r.id),
+      )
+    }
+
+    // c. レビュワーを並列実行し、スクリプト側で集約する。
+    // 2回目以降のレビューは、前ラウンドで CRITICAL/HIGH を出したレビュワーだけを
+    // 再実行し、確認対象も「前回指摘の解消」と「修正が新たに導入した問題」に絞る
+    const toRun =
+      flagged === null ? activeReviewers : activeReviewers.filter((r) => flagged.has(r.id))
+    const results = await pipeline(toRun, (r) =>
+      agent(
+        `${r.perspective}\n${reviewContract}` +
+          (flagged !== null && flagged.has(r.id)
+            ? '\nこれは再レビューです。対象は (1) 以下の前回指摘が解消されたかの確認と、' +
+              '(2) 修正が新たに導入した CRITICAL/HIGH の問題の検出のみです。' +
+              '新規の MEDIUM/LOW 指摘は報告しないでください:\n' +
+              flagged.get(r.id).join('\n')
+            : ''),
+        {
+          label: `${r.label} (round ${round})`,
+          model: BASE_MODEL,
+          schema: reviewSchema,
+        },
+      ).then((res) => ({ id: r.id, res })),
     )
 
-    findings = results.flatMap((r) => r.scope_in ?? [])
-    scopeOut.push(...results.flatMap((r) => r.scope_out ?? []))
+    // 結果を返さなかったレビュワー（スキップ・API エラー）の扱い:
+    // 全滅は系統的な失敗（セッションリミット等）なので合格と誤判定せず FAILED に畳む。
+    // 一部failの場合、そのレビュワーの前回指摘は「解消未確認」として持ち越す
+    const returned = results.filter(Boolean).filter((x) => x.res)
+    if (returned.length === 0 && toRun.length > 0) {
+      throw new Error(`round ${round}: レビュワーが1件も結果を返しませんでした`)
+    }
+    if (returned.length < toRun.length) {
+      log(
+        `round ${round}: ${toRun.length - returned.length} 件のレビュワーが結果を返しませんでした`,
+      )
+    }
+
+    findings = []
+    const nextFlagged = new Map()
+    for (const { id, res } of returned) {
+      const scopeIn = res.scope_in ?? []
+      const blocking = scopeIn.filter(isBlocking)
+      for (const f of scopeIn) {
+        if (!isBlocking(f)) minorFindings.add(f)
+      }
+      scopeOut.push(...(res.scope_out ?? []))
+      if (blocking.length > 0) nextFlagged.set(id, blocking)
+      findings.push(...blocking)
+    }
+    if (flagged !== null) {
+      const returnedIds = new Set(returned.map((x) => x.id))
+      for (const r of toRun) {
+        if (!returnedIds.has(r.id) && flagged.has(r.id)) {
+          nextFlagged.set(r.id, flagged.get(r.id))
+          findings.push(...flagged.get(r.id))
+        }
+      }
+    }
+    flagged = nextFlagged
 
     if (findings.length === 0) {
       reviewPassed = true
       break
     }
+  }
+
+  // MEDIUM/LOW の指摘はまとめて1回だけ修正する（再レビューはしない）
+  if (minorFindings.size > 0) {
+    await agent(
+      'git diff HEAD で現在の変更差分を確認したうえで、以下の軽微なレビュー指摘のうち' +
+        '妥当なものを修正してください。指摘リストの範囲を超える変更はしないこと。' +
+        '修正後の再レビューはありません:\n' +
+        [...minorFindings].join('\n'),
+      { label: '軽微な指摘の修正', model: BASE_MODEL },
+    )
   }
 
   // ── ステップ 7: スコープ外指摘の Issue 登録 ─────────────
@@ -352,7 +460,7 @@ try {
         '代わりに以下のスコープ外指摘を Issue として登録してください' +
         '（発見した経緯として Issue 番号を本文に含める）:\n' +
         scopeOut.map((s) => `- ${s}`).join('\n'),
-      { label: 'スコープ外Issue登録' },
+      { label: 'スコープ外Issue登録', model: BASE_MODEL },
     )
   }
 
@@ -361,13 +469,13 @@ try {
     followFile(`${pluginRoot}/commands/push-and-pr.md`) +
       'Skill ツールが使用できない場合は、コミット・プッシュ・PR 作成を git / gh コマンドで' +
       `直接実行してください（PR 本文に "Closes #${picked.number}" を含める）。`,
-    { label: 'PR作成' },
+    { label: 'PR作成', model: BASE_MODEL },
   )
 
   // ── ステップ 9: PR検証 ───────────────────────────────
   // push / PR 作成の失敗を検知できないと次イテレーションで同じ Issue を選び続けるため、
   // PR の実在確認は独立したエージェントで行う
-  const verify = await agent(
+  const verify = must(await agent(
     'git branch --show-current で現在のブランチ名を取得し、' +
       'gh pr list --head <ブランチ名> --state open --json number,url で PR の実在を確認してください。' +
       (reviewPassed
@@ -376,6 +484,7 @@ try {
       ' 結果を JSON で返してください。',
     {
       label: 'PR検証',
+      model: BASE_MODEL,
       schema: {
         type: 'object',
         required: ['exists'],
@@ -386,7 +495,7 @@ try {
         },
       },
     },
-  )
+  ), 'PR検証')
 
   if (!verify.exists) {
     return {

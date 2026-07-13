@@ -13,4 +13,5 @@ declare function agent(
 declare function pipeline<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]>
 declare function parallel<T>(tasks: Array<() => Promise<T>>): Promise<T[]>
 declare function phase<T>(name: string, fn: () => Promise<T>): Promise<T>
+declare function log(message: string): void
 declare const args: any
