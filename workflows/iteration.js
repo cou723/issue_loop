@@ -66,6 +66,14 @@ const followFile = (path) =>
 const BASE_MODEL = 'sonnet'
 const HEAVY_MODEL = 'opus'
 
+// agent({schema}) の結果は StructuredOutput ツールの呼び出しでしか受け取れない。
+// 「JSON で返して」という表現だとツールを呼ばず本文に JSON を書いて終了することがある
+// （haiku の Issue分類で観測。ランタイムの再促にも「呼んだはず」と幻覚して応じなかった）
+// ため、schema 付きプロンプトには必ずこの文言を添える
+const VIA_STRUCTURED_OUTPUT =
+  '返答は必ず StructuredOutput ツールの呼び出しで行ってください。' +
+  'メッセージ本文に JSON を書いても結果は受け取れず、ステップ失敗として扱われます。'
+
 // agent() はユーザーによるスキップや API エラー（セッションリミット等）で null を
 // 返すことがある。結果を参照するステップは null をここで検知し、外側の catch 経由で
 // FAILED シグナルとして畳む
@@ -91,7 +99,8 @@ try {
   const picked = must(
     await agent(
       followFile(`${pluginRoot}/agents/loop/pick-issue.md`) +
-        '作業完了後、選定結果を JSON で返してください。取り組む Issue がない場合は found: false とします。',
+        '作業完了後、選定結果を返してください。取り組む Issue がない場合は found: false とします。' +
+        VIA_STRUCTURED_OUTPUT,
       {
         label: 'Issue選定',
         model: BASE_MODEL,
@@ -121,11 +130,13 @@ try {
     ? followFile(`${pluginRoot}/agents/loop/info-gathering.md`) +
       'ユーザーへの質問は既に完了しています。「回答が既にある場合（再開時）」の手順に従い、' +
       '以下の回答（answers.md の代わりにここに直接示す）を current-issue.md への追記と' +
-      ' Issue へのコメントに反映してください。質問は生成せず needsInput: false を返します。\n' +
+      ' Issue へのコメントに反映してください。質問は生成せず needsInput: false を返します。' +
+      VIA_STRUCTURED_OUTPUT + '\n' +
       answers.map((a) => `- ${a.question}: ${a.answer}`).join('\n')
     : followFile(`${pluginRoot}/agents/loop/info-gathering.md`) +
-      'ただし questions.md へのファイル書き出しは行わず、質問の要否と内容を JSON で返してください。' +
-      '情報が十分なら needsInput: false、不足があれば needsInput: true と questions を返します。'
+      'ただし questions.md へのファイル書き出しは行わず、質問の要否と内容を返してください。' +
+      '情報が十分なら needsInput: false、不足があれば needsInput: true と questions を返します。' +
+      VIA_STRUCTURED_OUTPUT
 
   const info = must(await agent(infoPrompt, {
     label: '情報収集',
@@ -176,8 +187,8 @@ try {
   const classified = must(await agent(
     `Read ツールで ${pluginRoot}/agents/loop/pattern.md を読み、その分類基準に従って` +
       ' .issue-loop/current-issue.md の Issue を分類してください。' +
-      ' frontmatter の type: の更新は指示どおり行いますが、next-action.md は書き出さず、' +
-      ' 分類結果を JSON で返してください。',
+      ' frontmatter の type: の更新は指示どおり行いますが、next-action.md は書き出さないでください。' +
+      VIA_STRUCTURED_OUTPUT,
     {
       label: 'Issue分類',
       model: 'haiku',
@@ -200,7 +211,8 @@ try {
       `3. Issue #${picked.number}「${picked.title}」用のブランチを issue-<番号>-<kebab-case-slug> 形式で` +
       ' git checkout -b で作成する（タイトルから英数字・ハイフンのみ使用、スペースはハイフンに変換）\n' +
       '4. 前イテレーションの残骸を削除する: rm -f .issue-loop/changes.diff .issue-loop/out-of-scope.md .issue-loop/review-result.md .issue-loop/next-action.md\n' +
-      '完了後、作成したブランチ名を JSON で返してください。',
+      '完了後、作成したブランチ名を返してください。' +
+      VIA_STRUCTURED_OUTPUT,
     {
       label: 'ブランチ作成',
       model: BASE_MODEL,
@@ -221,8 +233,9 @@ try {
     '（git diff を自分で実行してはならない。やむを得ない場合は必ず git diff HEAD を使う）。' +
     '指摘は2つに分類する: scope_in = この変更で新たに導入された問題（今回修正する）、' +
     'scope_out = 変更が触れた/露出させた既存コードの問題（記録のみ、今回は修正しない）。' +
-    '各指摘は "<重大度 CRITICAL/HIGH/MEDIUM/LOW> — <file>:<line> — <説明と推奨対応>" 形式の文字列とし、JSON で返す。' +
-    'CRITICAL/HIGH はマージをブロックすべき問題（バグ・脆弱性・データ破壊等）に限って使い、迷う場合は MEDIUM 以下とする。'
+    '各指摘は "<重大度 CRITICAL/HIGH/MEDIUM/LOW> — <file>:<line> — <説明と推奨対応>" 形式の文字列とする。' +
+    'CRITICAL/HIGH はマージをブロックすべき問題（バグ・脆弱性・データ破壊等）に限って使い、迷う場合は MEDIUM 以下とする。' +
+    VIA_STRUCTURED_OUTPUT
 
   const reviewSchema = {
     type: 'object',
@@ -326,8 +339,9 @@ try {
       '1. git add -A && git diff HEAD -- . > .issue-loop/changes.diff で変更差分を確定する\n' +
       '2. test -f .issue-loop/ci.sh で CI スクリプトの有無を確認し、存在すれば bash .issue-loop/ci.sh を実行する\n'
     const prepTail =
-      '結果を JSON で返してください。ciPassed は ci.sh が存在しない場合 true とし、' +
-      'ciOutput は CI 失敗時のみエラー出力の要約を入れます。'
+      'ciPassed は ci.sh が存在しない場合 true とし、' +
+      'ciOutput は CI 失敗時のみエラー出力の要約を入れます。' +
+      VIA_STRUCTURED_OUTPUT
     const prep = must(
       await agent(
         activeReviewers === null
@@ -481,7 +495,7 @@ try {
       (reviewPassed
         ? ''
         : ' PR が存在する場合、gh pr comment <PR番号> --body "[issue-loop] ⚠️ レビュー上限（MAX_REVIEW_ITERATIONS）に達したため、未解決のスコープ内指摘が残ったまま PR を作成しました。マージ前に確認してください。" を投稿してください。') +
-      ' 結果を JSON で返してください。',
+      VIA_STRUCTURED_OUTPUT,
     {
       label: 'PR検証',
       model: BASE_MODEL,

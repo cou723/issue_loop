@@ -1,6 +1,7 @@
 ---
 description: "（試作）dynamic workflow ランタイム上で issue loop を実行する。/issue-loop:issueloop の workflow 版検証用。ユーザーが「workflow 版の issue loop を開始して」などと依頼した場合に呼び出される"
 argument-hint: "[-mi N] [--max-review-iterations N] [--comment TEXT, -c TEXT] [-h, --help]"
+model: opus
 allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Workflow", "Agent", "AskUserQuestion", "Read", "Write"]
 ---
 
