@@ -4,16 +4,16 @@ GitHub Issue ベースの自動開発ループを実現する Claude Code プラ
 
 ## 前提条件
 
-- [Claude Code](https://claude.ai/code)
+- [Claude Code](https://claude.ai/code) v2.1.154+（dynamic workflow ランタイムを使用）
 - [GitHub CLI](https://cli.github.com/)（`gh auth login` 済み）
 - [jq](https://jqlang.github.io/jq/)（PR 差分収集スクリプトが使用）
 - GitHub リポジトリ（Issue が登録済み）
 
 ### 必要な外部プラグイン
 
-`review` ステップが以下のプラグインのエージェントを利用します。事前にインストールしてください。
+`implement` / `debug` ステップが以下のプラグインのエージェントを利用します。事前にインストールしてください。
 
-- `pr-review-toolkit`（`comment-analyzer`, `pr-test-analyzer`, `silent-failure-hunter`, `code-simplifier`）
+- `pr-review-toolkit`（`code-simplifier`）
 - `feature-dev`（`code-explorer`）
 
 ## セットアップ
@@ -46,17 +46,20 @@ ln -s "$(pwd)" ~/.claude/skills/issue-loop
 
 Issue の情報が不足している場合はループを一時停止し、ユーザーへ質問してから実装を続行します（有人実行）。
 
-ループを中断するには:
+イテレーションの区切りでループを中断するには:
 
 ```
 /issue-loop:cancel
 ```
+
+実行中のイテレーション自体を止めるには `/workflows` ビューの停止操作を使います。
 
 ### その他のコマンド
 
 | コマンド | 説明 |
 |---|---|
 | `/issue-loop:close-issues [N]` | 最新 N 件（デフォルト: 3）のマージ済み PR を対象に、解決済みのオープン Issue を一括クローズする |
+| `/issue-loop:consolidate-issues` | オープン Issue から同種の細粒度 Issue を洗い出して統合する。統合案を承認してから実行される（ループ終了後にも自動で呼ばれる） |
 | `/issue-loop:push-and-pr` | 現在の変更をコミット・プッシュして PR を作成する（ループ内から自動で呼ばれるが単体でも使用可） |
 
 `push-and-pr` のスクリーンショット撮影条件（監視パス・開発サーバーURL）は、対象プロジェクトの `.claude/issue-loop.local.md` の YAML フロントマターで上書きできる（`screenshot-watch-path` / `screenshot-url`）。未設定の場合はそれぞれ `apps/web/src/` / `http://localhost:5173/` がデフォルト値として使われる。
@@ -78,7 +81,6 @@ Issue の情報が不足している場合はループを一時停止し、ユ�
       "Bash(test -d .issue-loop)",
       "Bash(test -f .issue-loop/*)",
       "Bash(touch .issue-loop/cancel-requested)",
-      "Bash(grep * .issue-loop/iteration-signal)",
       "Bash(rm -f .issue-loop/*)",
       "Bash(rm -rf .issue-loop/close-check)",
       "Bash(ls .issue-loop/close-check*)",

@@ -11,4 +11,4 @@ allowed-tools: ["Bash(test -d .issue-loop)", "Bash(touch .issue-loop/cancel-requ
 
 3. **EXISTS の場合**:
    - `touch .issue-loop/cancel-requested` を実行してキャンセルフラグを作成する
-   - 「🛑 issue-loop にキャンセルを要求しました。現在実行中のステップ（実装・レビュー等）の区切りで停止します。」と表示する
+   - 「🛑 issue-loop にキャンセルを要求しました。現在のイテレーション完了後に停止します。実行中のイテレーションを直ちに止めるには /workflows から停止してください。」と表示する

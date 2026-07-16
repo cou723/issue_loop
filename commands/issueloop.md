@@ -1,10 +1,17 @@
 ---
 description: "GitHub Issue を自動的に選定・実装・レビュー・PR作成まで繰り返し処理する自動開発ループを開始する。ユーザーが「issue loop を開始して」「未対応の Issue を自動で片付けて」「次の Issue に取り組んで」などと依頼した場合に呼び出される"
 argument-hint: "[-mi N] [--max-iterations N] [--max-review-iterations N] [--comment TEXT, -c TEXT] [-h, --help]"
-allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/iteration-signal)", "Bash(rm -f .issue-loop/questions.md)", "Bash(rm -f .issue-loop/answers.md)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Bash(grep * .issue-loop/iteration-signal)", "Bash(git branch *)", "Bash(gh pr list *)", "Agent", "AskUserQuestion", "Read", "Write", "ScheduleWakeup"]
+model: opus
+allowed-tools: ["Bash(bash *setup-issue-loop.sh)", "Bash(test -f .issue-loop/cancel-requested)", "Bash(test -f .issue-loop/ci.sh)", "Bash(chmod +x .issue-loop/ci.sh)", "Bash(rm -f .issue-loop/issue-selection-comment.md)", "Workflow", "Agent", "AskUserQuestion", "Read", "Write", "Skill(issue-loop:consolidate-issues)"]
 ---
 
 # Issue Loop
+
+dynamic workflow ランタイム上で動く。1イテレーション分のオーケストレーション（PR同期→Issue選定→実装/レビュー→PR作成）は `workflows/iteration.js` のスクリプトが実行し、このコマンドは**ループ制御・ユーザーへの質問代行・キャンセル確認のみ**を行う。
+
+- イテレーションの結果は workflow の構造化リターン（`signal` フィールド）で受け取る
+- `NEEDS_INPUT` 後の再開は `resumeFromRunId` で行う（完了済みステップはランタイムのキャッシュが返る）。ただしキャッシュは workflow を起動したセッション内でのみ有効で、セッション再起動を挟んで `resumeFromRunId` を渡した場合は完了済みステップも再実行される（正常に完走はする）
+- 実行中のイテレーションの中断は `/workflows` ビューの停止操作で行う（イテレーション間の中断は `/issue-loop:cancel`）
 
 ## 引数の解釈
 
@@ -27,42 +34,20 @@ OPTIONS:
   --comment TEXT, -c TEXT     Issue 選定時の追加基準（例: "バグ修正を優先"）
 
 STOPPING:
-  /issue-loop:cancel でループを中断できます
+  実行中のイテレーションは /workflows から停止できます
+  イテレーション間の中断は /issue-loop:cancel を実行してください
   Issue がなくなった時点で自動終了します
 ```
 
-このループは**有人実行**を前提とする。Issue の情報が不足している場合は、ループを止めてユーザーへ質問し（後述の `NEEDS_INPUT` 処理）、回答を得てから実装を進める。
-
-## 多重起動ガード
-
-開始時、同一セッションで起動したイテレーションが未完了のまま実行中であることが文脈から分かる場合は、新規ループを開始せず既存イテレーションの完了待ちに戻る。
-
-## サブエージェント待機の規約
-
-`issue-loop:iteration` サブエージェントはバックグラウンドで実行される。起動したら完了通知（task-notification）を待って turn を終え、通知を受けてからシグナル確認に進む。
-
-完了通知が届かない場合のフォールバックとして ScheduleWakeup を予約してよい（1200秒以上）。その際:
-
-- prompt に**このコマンド（`/issue-loop:issueloop`）を渡してはならない**。wakeup 発火でコマンドが再入力されると、ユーザーの新規依頼と区別がつかず、完了済みループの後に依頼されていない新規ループを開始する事故につながる
-- 代わりに次の趣旨のテキストを prompt に渡す: 「issue-loop のフォールバック wakeup。`.issue-loop/iteration-signal` を確認し、シグナルがあればシグナル確認処理へ進む。未作成（実行中）なら再度フォールバック wakeup を予約して待機を続ける。ループが既に終了している場合は ScheduleWakeup を `stop: true` で呼んで終了する。**新規ループを開始してはならない**」
+このループは**有人実行**を前提とする。Issue の情報が不足している場合、workflow は `NEEDS_INPUT` を返して終了し、このメインセッションがユーザーへ質問して回答を渡して再開する。
 
 ## セットアップ
 
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh"` を実行する。
+1. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup-issue-loop.sh"` を実行する
+2. Issue 選定コメント: `ISSUE_SELECTION_COMMENT` が指定されていれば `.issue-loop/issue-selection-comment.md` に Write し、なければ `rm -f .issue-loop/issue-selection-comment.md` で削除する
+3. CI スクリプト生成: 下記「CI スクリプト生成」を行う
 
-## Issue 選定コメントの設定
-
-`ISSUE_SELECTION_COMMENT` が指定されている場合:
-
-1. `.issue-loop/issue-selection-comment.md` にコメント本文を Write する
-2. ファイルの内容は `pick-issue` エージェントが選定基準として読み取る
-
-`ISSUE_SELECTION_COMMENT` が指定されていない場合:
-
-1. `rm -f .issue-loop/issue-selection-comment.md` を実行してファイルを削除する
-2. これにより `pick-issue` エージェントは既定の基準（マイルストーン・ラベル・番号順）で Issue を選定する
-
-## CI スクリプト生成
+### CI スクリプト生成
 
 `test -f .issue-loop/ci.sh` を実行し、ファイルが**存在しない場合のみ**以下を行う。
 
@@ -103,94 +88,62 @@ ci.sh はリモート CI が実行するチェックのローカル再現であ�
   <ISSUE_SELECTION_COMMENT が指定されている場合のみ表示>
   Issue 選定コメント: <ISSUE_SELECTION_COMMENT>
 
-  中断するには /issue-loop:cancel を実行してください。
+  実行中のイテレーションは /workflows から停止できます。
+  イテレーション間の中断は /issue-loop:cancel を実行してください。
 ```
 
 ## ループ
 
 iteration = 1 から始め MAX_ITERATIONS 回を上限に以下を繰り返す。上限超過時は「🛑 最大イテレーション数 (<MAX_ITERATIONS>) に達しました。」と表示して終了する。
 
----
-
-### イテレーション開始
+### 1. イテレーション開始
 
 「🔄 イテレーション <iteration> / <MAX_ITERATIONS> を開始します」と表示する。
 
 `test -f .issue-loop/cancel-requested && echo CANCEL || echo OK` を実行し、CANCEL なら「🛑 キャンセルリクエストを受け付けました。」と表示してループを終了する。
 
----
+### 2. workflow 起動
 
-### イテレーション実行
+Workflow ツールを以下の入力で起動し、実行完了まで待つ:
 
-前イテレーションの遺物をクリアする（古いシグナルや質問・回答を誤読しないため）:
-- `rm -f .issue-loop/iteration-signal`
-- `rm -f .issue-loop/questions.md`
-- `rm -f .issue-loop/answers.md`
+- `scriptPath`: `"${CLAUDE_PLUGIN_ROOT}/workflows/iteration.js"`
+- `args`: `{ "pluginRoot": "<CLAUDE_PLUGIN_ROOT の実パス>", "maxReviewIterations": <MAX_REVIEW_ITERATIONS>, "answers": null }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない。`pluginRoot` が解決できない場合、workflow はエージェントを起動せず即 `FAILED` を返す）
 
-Agent ツールで `issue-loop:iteration` サブエージェントを起動する。
-- prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = false"
+### 3. 結果確認
 
-起動後は「サブエージェント待機の規約」に従って完了通知を待つ。
+workflow の戻り値の `signal` フィールドで分岐する:
 
----
-
-### シグナル確認
-
-`grep -s "" .issue-loop/iteration-signal` を実行してシグナルを確認する。
-
+- `DONE` → 「✅ イテレーション <iteration> 完了: Issue #<issue> → PR <prUrl>」と表示する。`reviewStatus` が `fail` の場合は「⚠️ レビュー上限に達したため未解決の指摘が残っています」を併記する。iteration を increment して次イテレーションへ
 - `NO_ISSUE` → 「✅ 取り組む Issue がなくなりました。ループを終了します。」と表示してループを終了する
-- `CANCELLED` → 「🛑 キャンセルリクエストを受け付けました。」と表示してループを終了する
-- `FAILED` → 「❌ イテレーション <iteration> が失敗しました。安全のためループを終了します。`.issue-loop/` の状態を確認してください。」と表示してループを終了する
-- `NEEDS_INPUT` → **下記「ユーザーへの質問（NEEDS_INPUT 処理）」を実行する**。完了後、再度このシグナル確認を行う
-- **シグナルが空または存在しない**（出力が空）→ コンテキスト圧縮等でシグナル書き込みが漏れた可能性がある。以下の回復処理を行う:
-  1. `git branch --show-current` で現在のブランチ名を確認する
-  2. `gh pr list --head <ブランチ名> --state open --json number` で PR の存在を確認する
-  - PR が存在する → `DONE` として扱い、次へ進む。「⚠️ イテレーション <iteration>: シグナルが未作成でしたが PR が確認できたため DONE として続行します。（Claude Code バグ #17688 によりエージェント frontmatter の Stop フックがサブエージェントに適用されないため、シグナル書き忘れが発生することがあります）」と表示する
-  - PR が存在しない → 「⚠️ イテレーション <iteration> が結果を残さず終了しました（異常終了の可能性）。安全のためループを終了します。」と表示してループを終了する
-- `DONE` → 正常完了。次へ進む
+- `FAILED` → 「❌ イテレーション <iteration> が失敗しました: <reason>。安全のためループを終了します。」と表示してループを終了する
+- `NEEDS_INPUT` → 下記「ユーザーへの質問」を実行する
+- 戻り値が取得できない・`signal` が読めない（workflow の異常終了や手動停止を含む）→ 「⚠️ イテレーション <iteration> が結果を残さず終了しました。安全のためループを終了します。」と表示してループを終了する
 
----
+### 4. ユーザーへの質問（NEEDS_INPUT 処理）
 
-### ユーザーへの質問（NEEDS_INPUT 処理）
+workflow は AskUserQuestion を使えないため、質問はこのメインセッションが代行する。
 
-`AskUserQuestion` はサブエージェントからは使えないため、質問はこのメインセッションが代行する。
-
-1. Read ツールで `.issue-loop/questions.md` を読む（存在しない場合は異常。「⚠️ NEEDS_INPUT が返りましたが質問が見つかりません。安全のためループを終了します。」と表示してループを終了する）
-2. フロントマターの `issue:` フィールドから Issue 番号を取得し、「⚠️ Issue #<number> の実装に必要な情報が不足しています。以下の質問に回答してください。」とテキストで表示する
-3. `questions.md` の各質問（`question` / `header` / `multiSelect` / 選択肢）を `AskUserQuestion` ツールの形式に変換し、まとめて質問する
-4. 得られた回答を Write ツールで `.issue-loop/answers.md` に書き出す（形式は下記）
-5. `rm -f .issue-loop/iteration-signal` でシグナルをクリアする
-6. Agent ツールで `issue-loop:iteration` サブエージェントを**再起動**する。
-   - prompt: "イテレーションを実行してください。MAX_REVIEW_ITERATIONS = <MAX_REVIEW_ITERATIONS>, RESUME = true"
+1. 「⚠️ Issue #<issue> の実装に必要な情報が不足しています。以下の質問に回答してください。」とテキストで表示する
+2. 戻り値の `questions` 配列（`question` / `header` / `multiSelect` / `options`）を `AskUserQuestion` ツールの形式に変換し、まとめて質問する
+3. Workflow ツールを**再起動**する:
+   - `scriptPath`: 同じ
+   - `resumeFromRunId`: 直前の run の ID
+   - `args`: `{ "pluginRoot": <同じ>, "maxReviewIterations": <同じ>, "answers": [{ "question": "<質問文>", "answer": "<ユーザーの回答>" }, ...] }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない）
    - **iteration カウントは増やさない**（同じ Issue の続きを実行するため）
-   - 起動後は「サブエージェント待機の規約」に従って完了通知を待つ
-
-`answers.md` の形式:
-
-```markdown
----
-issue: <number>
----
-- <質問文>: <ユーザーの回答>
-- <質問文>: <ユーザーの回答>
-```
-
----
-
-### イテレーション完了
-
-「✅ イテレーション <iteration> 完了」と表示する。iteration を increment する。
-
----
+   - キャッシュは workflow を起動したセッション内でのみ有効。同一セッションで再開する場合は PR同期・Issue選定がキャッシュから返り情報収集以降が再実行されるが、セッション再起動（中断からの再開など）を挟んで `resumeFromRunId` を渡した場合は完了済みステップも再実行される（動作自体は正常に完走する）
+4. 完了後、再度「3. 結果確認」を行う
 
 ## ループ終了後
 
-1. フォールバック wakeup を予約していた場合は、ScheduleWakeup を `stop: true` で呼んで**必ず停止する**（完了後の再発火が依頼されていない新規ループを開始する事故を防ぐ）
-2. 以下を表示する:
+以下を表示する:
 
 ```
 🏁 Issue loop が完了しました。
   実行イテレーション数: <完了したイテレーション数>
 ```
 
-3. Agent ツールで `issue-loop:result-dashboard` サブエージェントを**同期**（`run_in_background: false`）で起動し、今回の実行結果ダッシュボードを表示する（バックグラウンド起動して wakeup で完了を待ってはならない）。
+Agent ツールで `issue-loop:result-dashboard` サブエージェントを**同期**（`run_in_background: false`）で起動し、今回の実行結果ダッシュボードを表示する。
+
+### Issue 統合
+
+ダッシュボード表示後、Skill ツールで `issue-loop:consolidate-issues` を起動し、実行中に増えた細粒度の Issue を統合する（統合案の承認はユーザーへ質問する）。ただしイテレーションが1回も完了しなかった場合（初回で `NO_ISSUE` / `FAILED`）は Issue が増えていないためスキップする。

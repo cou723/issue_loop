@@ -5,7 +5,7 @@ description: 過去の issue-loop 実行をセッションログから復元し�
 
 # Evaluate Run
 
-issue-loop の1回の実行を、(1) セッションログから事実を復元し、(2) 期待ワークフロー（このリポジトリの `commands/issueloop.md`・`agents/iteration.md`）と突合し、(3) 正常動作・バグ・設計課題に分類して報告する手順。
+issue-loop の1回の実行を、(1) セッションログから事実を復元し、(2) 期待ワークフロー（このリポジトリの `commands/issueloop.md`・`workflows/iteration.js`）と突合し、(3) 正常動作・バグ・設計課題に分類して報告する手順。
 
 以下で「スクリプト」はこのスキルのベースディレクトリ配下の `scripts/` を指す。
 
@@ -39,7 +39,7 @@ issue-loop の1回の実行を、(1) セッションログから事実を復元�
 
 ## フェーズ2: メインセッションのタイムライン復元
 
-- 仮説: メインセッションには「セットアップ → イテレーション起動 → 待機（wakeup）→ シグナル確認 → 質問/完了処理」のオーケストレーションだけが現れるはず。
+- 仮説: メインセッションには「セットアップ → Workflow 起動 → 戻り値（`signal`）確認 → 質問/完了処理」のオーケストレーションだけが現れるはず。
 - 方法:
 
 ```bash
@@ -47,32 +47,32 @@ python3 <skill-base>/scripts/dump-timeline.py <アンカー.jsonl>
 ```
 
 - 着目点:
-  - `iteration-signal` の grep 結果（`NEEDS_INPUT` / `DONE`）と、その後の分岐が手順どおりか
-  - `ScheduleWakeup` の発火（コマンド再入力として現れる）で、実行中の重複起動を防いだか・**完了後に新規ループを勝手に始めていないか**
+  - Workflow ツールの戻り値の `signal`（`DONE` / `NO_ISSUE` / `NEEDS_INPUT` / `FAILED`）と、その後の分岐が手順どおりか
+  - `args` を JSON オブジェクトとして渡しているか（JSON 文字列で渡すと workflow が即 `FAILED` を返す）
   - `RES ERR` 行（ツールエラー、ユーザーによる拒否・中断）
-  - AskUserQuestion → answers.md 書き出し → RESUME=true 再起動の一連
+  - AskUserQuestion → `args.answers` 付きの `resumeFromRunId` 再起動の一連（イテレーション数を増やしていないか）
 
 ## フェーズ3: サブエージェントの一括要約
 
-- 仮説: 実作業はサブエージェント群にあり、起動時刻順に並べれば「PR同期 → Issue選定 → 情報収集 → 分類 → 実装 → レビュー(並列レビュワー) → 修正 → スコープ外Issue登録 → ダッシュボード」の系列が読み取れるはず。
-- 方法:
+- 仮説: 実作業は workflow が起動したエージェント群にあり、起動時刻順に並べれば「PR同期 → Issue選定 → 情報収集 → 分類 → ブランチ作成 → 実装 → レビュー準備 → レビュワー並列 →（再ラウンド）→ 軽微修正 → スコープ外Issue登録 → PR作成 → PR検証」の系列が読み取れるはず。
+- 方法: workflow の transcript ディレクトリにある `journal.jsonl`（各 `agent()` の実際の戻り値を記録）と `agent-<id>.jsonl`（各エージェントの transcript）を読む。`/close-issues` や `result-dashboard` など Agent ツール起動分は従来どおり:
 
 ```bash
 python3 <skill-base>/scripts/summarize-subagents.py \
   ~/.claude/projects/<ENCODED>/<sessionId>/subagents/
 ```
 
-- 判断: 各エージェントの IN（プロンプト）から役割を同定し、OUT（最終発言）が役割の完了を主張しているか確認する。`errors=` 付きのものと、OUT が途切れている・完了を主張していないものを深掘り対象にする。
+- 判断: 各エージェントの IN（プロンプト）から役割を同定し、OUT / 構造化リターンが役割の完了を主張しているか確認する。`errors=` 付きのものと、OUT が途切れている・完了を主張していないものを深掘り対象にする。
 
-## フェーズ4: 中核エージェントの深掘り
+## フェーズ4: レビューループの深掘り
 
-- 仮説: iteration エージェント（IN が「イテレーションを実行してください」のもの）に、レビューループの制御・待機戦略・PR 作成の実態が全て記録されているはず。
-- 方法: フェーズ2と同じ `dump-timeline.py` を iteration エージェントの transcript に適用する。
+- 仮説: レビューループの制御はスクリプトが決定的に行うため、逸脱があるとすればエージェント個々の作業内容（指摘の質・修正の実態・StructuredOutput の返答）にあるはず。
+- 方法: `journal.jsonl` で各ラウンドの実行系列と戻り値を確認し、疑わしいエージェントの transcript に `dump-timeline.py` を適用する。
 - 着目点:
-  - レビュー回数と各回の status、MAX_REVIEW_ITERATIONS の遵守
+  - レビューラウンド数と各ラウンドの blocking 指摘、maxReviewIterations の遵守
   - fail のまま上限到達した場合に PR へ警告コメントを投稿したか
-  - 待機方法（`sleep` ポーリングや `echo idle` 連発はビジーウェイト＝設計課題として記録）
-  - 各ステップ前のキャンセルチェック、CI 実行の有無
+  - CI 実行の有無（ci.sh が存在する場合）
+  - schema 付きステップが StructuredOutput ツールを呼ばず本文に JSON を書いていないか
 
 ## フェーズ5: 外部状態との突合
 
@@ -96,11 +96,10 @@ python3 <skill-base>/scripts/tokens-by-agent.py <アンカー.jsonl>
 
 既知の失敗パターン（過去の評価で実際に観測されたもの）:
 
-- 完了後に残った ScheduleWakeup が再発火し、依頼されていない新規ループを開始する
 - レビューが収束しない（毎回新しい軽微な指摘が出て必ず上限到達する）
 - スコープ外 Issue 登録の暴発（小さな変更から多数の Issue が生まれ、次のループの入力になり自己増殖する）
-- サブエージェントのビジーウェイト（sleep ポーリング）
-- 中断後の `.issue-loop/` に stale なシグナル・質問ファイルが残る
+- schema 付きステップが StructuredOutput ツールを呼ばず、本文に JSON を書いて終了する（haiku で観測）
+- `args` を JSON 文字列で渡してしまい workflow が即 `FAILED` を返す
 
 レポートは以下を含める:
 

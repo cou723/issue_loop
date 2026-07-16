@@ -12,8 +12,7 @@ export const meta = {
 //
 // 戻り値は必ず { signal, ... } の形を取る:
 //   DONE / NO_ISSUE / NEEDS_INPUT / FAILED
-// （従来の .issue-loop/iteration-signal ファイルの代替。CANCELLED は廃止し、
-//   実行中の中断は /workflows ビューの停止操作に委ねる）
+// （実行中の中断は /workflows ビューの停止操作に委ねる）
 
 // args の正規化。メインセッションが誤って JSON 文字列として渡した場合は
 // parse で救済するが、parse 失敗は握りつぶさず FAILED として即終了する。
@@ -125,7 +124,7 @@ try {
   // ── ステップ 3: 情報収集 ─────────────────────────────
   // answers の有無でプロンプトが変わるため、NEEDS_INPUT 後に resumeFromRunId で
   // 再実行すると、前段（PR同期・Issue選定）はキャッシュが返り、ここから先だけが
-  // 再実行される。従来の RESUME フラグとステップスキップ規約の代替
+  // 再実行される
   const infoPrompt = answers
     ? followFile(`${pluginRoot}/agents/loop/info-gathering.md`) +
       'ユーザーへの質問は既に完了しています。「回答が既にある場合（再開時）」の手順に従い、' +
