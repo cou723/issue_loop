@@ -107,7 +107,8 @@ iteration = 1 から始め MAX_ITERATIONS 回を上限に以下を繰り返す�
 Workflow ツールを以下の入力で起動し、実行完了まで待つ:
 
 - `scriptPath`: `"${CLAUDE_PLUGIN_ROOT}/workflows/iteration.js"`
-- `args`: `{ "pluginRoot": "<CLAUDE_PLUGIN_ROOT の実パス>", "maxReviewIterations": <MAX_REVIEW_ITERATIONS>, "answers": null }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない。`pluginRoot` が解決できない場合、workflow はエージェントを起動せず即 `FAILED` を返す）
+- `args`: `{ "pluginRoot": "${CLAUDE_PLUGIN_ROOT}", "maxReviewIterations": <MAX_REVIEW_ITERATIONS>, "answers": null }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない）
+- `pluginRoot` の値はこのコマンド本文のロード時に実パスへ展開済みである。上記の値をそのまま転記し、**推測・導出・書き換えをしない**（誤ったパスを渡すと workflow は指示ファイルを読めず `FAILED` を返す）
 
 ### 3. 結果確認
 
@@ -119,6 +120,8 @@ workflow の戻り値の `signal` フィールドで分岐する:
 - `NEEDS_INPUT` → 下記「ユーザーへの質問」を実行する
 - 戻り値が取得できない・`signal` が読めない（workflow の異常終了や手動停止を含む）→ 「⚠️ イテレーション <iteration> が結果を残さず終了しました。安全のためループを終了します。」と表示してループを終了する
 
+`FAILED` および戻り値なしで終了する場合、独自の復旧を試みてはならない: 原因調査・プラグインや workflow スクリプトの修正・実装や PR 作成の続行はすべて禁止。メッセージを表示したら「ループ終了後」の処理へ直接進む。
+
 ### 4. ユーザーへの質問（NEEDS_INPUT 処理）
 
 workflow は AskUserQuestion を使えないため、質問はこのメインセッションが代行する。
@@ -128,7 +131,7 @@ workflow は AskUserQuestion を使えないため、質問はこのメインセ
 3. Workflow ツールを**再起動**する:
    - `scriptPath`: 同じ
    - `resumeFromRunId`: 直前の run の ID
-   - `args`: `{ "pluginRoot": <同じ>, "maxReviewIterations": <同じ>, "answers": [{ "question": "<質問文>", "answer": "<ユーザーの回答>" }, ...] }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない）
+   - `args`: `{ "pluginRoot": "${CLAUDE_PLUGIN_ROOT}", "maxReviewIterations": <同じ>, "answers": [{ "question": "<質問文>", "answer": "<ユーザーの回答>" }, ...] }` を **JSON オブジェクトとして渡す**（JSON 文字列に変換して渡してはならない）
    - **iteration カウントは増やさない**（同じ Issue の続きを実行するため）
    - キャッシュは workflow を起動したセッション内でのみ有効。同一セッションで再開する場合は PR同期・Issue選定がキャッシュから返り情報収集以降が再実行されるが、セッション再起動（中断からの再開など）を挟んで `resumeFromRunId` を渡した場合は完了済みステップも再実行される（動作自体は正常に完走する）
 4. 完了後、再度「3. 結果確認」を行う

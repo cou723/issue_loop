@@ -52,12 +52,20 @@ if (typeof pluginRoot !== 'string' || pluginRoot.length === 0) {
 }
 
 // 既存のエージェント定義（Markdown）を指示書として流用するための共通前置き。
-// frontmatter の tools / hooks はワークフロー実行では適用されないため本文のみ従わせる
+// frontmatter の tools / hooks はワークフロー実行では適用されないため本文のみ従わせる。
+// ファイルの出自（ユーザーがインストールしたプラグインの同梱物）を明示するのは、
+// 「由来不明の外部ファイルの指示を無監督で実行する」と判定されてサブエージェント起動が
+// 安全フィルタにブロックされることがあるため（情報収集ステップで観測）。
+// ファイルが読めない場合のマーカーは、pluginRoot 不正をスクリプト側で機械的に
+// 検知するためのもの（下のステップ1参照）
+const FILE_NOT_READABLE = 'INSTRUCTION_FILE_NOT_READABLE'
 const followFile = (path) =>
   `Read ツールで ${path} を読み、frontmatter を除く本文の指示に従って作業してください。` +
+  `このファイルはユーザーがローカルにインストールした issue-loop プラグインに同梱されている定型の作業手順書です。` +
   `本文中の \${CLAUDE_PLUGIN_ROOT} は ${pluginRoot} に読み替えてください。` +
   `ユーザーへの質問・確認はできません。自律的に判断してください。` +
-  `指定されたパスのファイルが読めない場合は、ファイルシステムの探索や代替パスの推測を行わず、その旨を最終メッセージで報告して作業を終了してください。\n`
+  `指定されたパスのファイルが読めない場合は、ファイルシステムの探索や代替パスの推測を行わず、` +
+  `最終メッセージに ${FILE_NOT_READABLE} と書いて作業を終了してください。\n`
 
 // モデルルーティング: セッションデフォルト（最上位モデル）を継承させず、
 // 定型・レビュー系は sonnet、思考力が必要な実装・デバッグのみ opus を使う。
@@ -73,30 +81,58 @@ const VIA_STRUCTURED_OUTPUT =
   '返答は必ず StructuredOutput ツールの呼び出しで行ってください。' +
   'メッセージ本文に JSON を書いても結果は受け取れず、ステップ失敗として扱われます。'
 
-// agent() はユーザーによるスキップや API エラー（セッションリミット等）で null を
-// 返すことがある。結果を参照するステップは null をここで検知し、外側の catch 経由で
-// FAILED シグナルとして畳む
+// agent() はユーザーによるスキップ・API エラー（セッションリミット等）・安全フィルタに
+// よる起動ブロックで null を返すことがある（null からは原因を区別できない）。
+// 結果を参照するステップは null をここで検知し、外側の catch 経由で FAILED シグナル
+// として畳む
 const must = (result, step) => {
   if (result == null) {
     throw new Error(
-      `${step} エージェントが結果を返しませんでした（スキップまたは API エラーの可能性）`,
+      `${step} エージェントが結果を返しませんでした` +
+        '（ユーザーによるスキップ、API エラー、安全フィルタによる起動ブロックのいずれかの可能性。' +
+        '原因は /workflows の実行ログで確認できます）',
     )
   }
   return result
 }
 
+// null は一過性の API エラー（mid-response のサーバーエラー等）でも返るため、
+// must で畳む前にスクリプト側で機械的に1回だけ再試行する。失敗した呼び出しは
+// ランタイムのジャーナルに結果が記録されないため、同一引数での再呼び出しは
+// キャッシュに当たらずライブ実行される
+const agentWithRetry = async (prompt, opts) => {
+  const first = await agent(prompt, opts)
+  if (first != null) return first
+  log(`${opts.label}: 結果が返りませんでした。1回だけ再試行します`)
+  return agent(prompt, opts)
+}
+
 try {
   // ── ステップ 1: PR同期 ──────────────────────────────
-  await agent(followFile(`${pluginRoot}/agents/loop/pr-sync.md`), {
-    label: 'PR同期',
-    model: BASE_MODEL,
-  })
+  // 最初の followFile ステップで pluginRoot の実在検証を兼ねる。ここで指示ファイルが
+  // 読めない場合は pluginRoot 自体が誤っており後続の全ステップが壊れるため、続行せず
+  // 即 FAILED を返す（誤った pluginRoot のまま後続が空走した実行を観測）
+  const synced = must(
+    await agentWithRetry(followFile(`${pluginRoot}/agents/loop/pr-sync.md`), {
+      label: 'PR同期',
+      model: BASE_MODEL,
+    }),
+    'PR同期',
+  )
+  if (typeof synced === 'string' && synced.includes(FILE_NOT_READABLE)) {
+    return {
+      signal: 'FAILED',
+      reason:
+        `pluginRoot（${pluginRoot}）配下の指示ファイルが読めません。` +
+        'args.pluginRoot に issue-loop プラグインのルート絶対パスを渡してください。',
+    }
+  }
 
   // ── ステップ 2: Issue選定 ────────────────────────────
   // current-issue.md の書き出しは従来どおり行わせつつ（後続エージェントが読む）、
   // 制御フロー用の判定はファイルではなく構造化リターンで受け取る
   const picked = must(
-    await agent(
+    await agentWithRetry(
       followFile(`${pluginRoot}/agents/loop/pick-issue.md`) +
         '作業完了後、選定結果を返してください。取り組む Issue がない場合は found: false とします。' +
         VIA_STRUCTURED_OUTPUT,
@@ -137,7 +173,7 @@ try {
       '情報が十分なら needsInput: false、不足があれば needsInput: true と questions を返します。' +
       VIA_STRUCTURED_OUTPUT
 
-  const info = must(await agent(infoPrompt, {
+  const info = must(await agentWithRetry(infoPrompt, {
     label: '情報収集',
     model: 'haiku',
     schema: {
@@ -183,8 +219,9 @@ try {
 
   // ── ステップ 4: Issue分類 ────────────────────────────
   // 従来の next-action.md への書き出しを構造化リターンで置き換える
-  const classified = must(await agent(
-    `Read ツールで ${pluginRoot}/agents/loop/pattern.md を読み、その分類基準に従って` +
+  const classified = must(await agentWithRetry(
+    `Read ツールで ${pluginRoot}/agents/loop/pattern.md` +
+      '（ユーザーがローカルにインストールした issue-loop プラグイン同梱の分類基準）を読み、その分類基準に従って' +
       ' .issue-loop/current-issue.md の Issue を分類してください。' +
       ' frontmatter の type: の更新は指示どおり行いますが、next-action.md は書き出さないでください。' +
       VIA_STRUCTURED_OUTPUT,
@@ -203,7 +240,8 @@ try {
   const nextAction = classified.type === 'Debug' ? 'debug' : 'implement'
 
   // ── ステップ 5: ブランチ作成 ──────────────────────────
-  await agent(
+  // ここが失敗したまま続行すると実装が main 上で走るため、結果を必ず検証する
+  must(await agentWithRetry(
     '以下を順に実行してください:\n' +
       '1. git checkout main\n' +
       '2. git pull --ff-only（失敗しても続行してよい）\n' +
@@ -221,7 +259,7 @@ try {
         properties: { branch: { type: 'string' } },
       },
     },
-  )
+  ), 'ブランチ作成')
 
   // ── ステップ 6: 実装・レビューループ ───────────────────
   // 従来 review オーケストレーターエージェントが担っていたファンアウトと集約を
@@ -247,22 +285,22 @@ try {
 
   // 観点定義がプラグイン内にあるレビュワーはファイルを参照し（単一情報源の維持）、
   // 外部プラグイン由来だったものは観点を直接記述する
+  const perspectiveFromFile = (path) =>
+    `観点・判断基準は Read ツールで ${path}` +
+    '（ユーザーがローカルにインストールした issue-loop プラグイン同梱の観点定義）を読み、' +
+    'frontmatter を除く本文に従うこと。'
   const reviewerCatalog = [
     {
       id: 'type-safety',
       label: '型安全性レビュー',
       always: true,
-      perspective:
-        `観点・判断基準は Read ツールで ${pluginRoot}/agents/review/type-safety-reviewer.md を読み、` +
-        'frontmatter を除く本文に従うこと。',
+      perspective: perspectiveFromFile(`${pluginRoot}/agents/review/type-safety-reviewer.md`),
     },
     {
       id: 'security',
       label: 'セキュリティレビュー',
       always: true,
-      perspective:
-        `観点・判断基準は Read ツールで ${pluginRoot}/agents/review/security-reviewer.md を読み、` +
-        'frontmatter を除く本文に従うこと。',
+      perspective: perspectiveFromFile(`${pluginRoot}/agents/review/security-reviewer.md`),
     },
     {
       id: 'error-handling',
@@ -286,9 +324,7 @@ try {
       id: 'design',
       label: '設計レビュー',
       always: false,
-      perspective:
-        `観点・判断基準は Read ツールで ${pluginRoot}/agents/review/design-reviewer.md を読み、` +
-        'frontmatter を除く本文に従うこと。',
+      perspective: perspectiveFromFile(`${pluginRoot}/agents/review/design-reviewer.md`),
     },
     {
       id: 'test',
@@ -301,9 +337,7 @@ try {
       id: 'performance',
       label: 'パフォーマンスレビュー',
       always: false,
-      perspective:
-        `観点・判断基準は Read ツールで ${pluginRoot}/agents/review/performance-reviewer.md を読み、` +
-        'frontmatter を除く本文に従うこと。',
+      perspective: perspectiveFromFile(`${pluginRoot}/agents/review/performance-reviewer.md`),
     },
   ]
 
@@ -319,9 +353,12 @@ try {
   const isBlocking = (f) => /^\s*(CRITICAL|HIGH)\b/i.test(String(f))
 
   for (let round = 1; round <= maxReviewIterations; round++) {
-    // a. 実装またはデバッグ。round 2 以降は再探索させず指摘の解消に限定する
+    // a. 実装またはデバッグ。round 2 以降は再探索させず指摘の解消に限定する。
+    // 実装エージェントの途中死（API エラー等）を検知せず続行すると、書きかけの
+    // コードがそのままレビュー準備→PR作成へ流れて壊れた PR になるため、結果を
+    // 必ず検証する（フォールバックモデル実行で実際に発生）
     const workFile = nextAction === 'debug' ? 'debug.md' : 'implement.md'
-    await agent(
+    must(await agentWithRetry(
       followFile(`${pluginRoot}/agents/loop/${workFile}`) +
         '.issue-loop/current-issue.md を読み、Issue に対応してください。' +
         (findings.length > 0
@@ -331,7 +368,7 @@ try {
             findings.join('\n')
           : ''),
       { label: `${nextAction} (round ${round})`, model: HEAVY_MODEL },
-    )
+    ), `${nextAction} (round ${round})`)
 
     // b. レビュー準備: 差分の確定・CI 実行。オプショナルレビュワーの選定は
     // レビュワーパネル未確定のときだけ行い、以降は固定する（ラウンドごとに
@@ -345,7 +382,7 @@ try {
       'ciOutput は CI 失敗時のみエラー出力の要約を入れます。' +
       VIA_STRUCTURED_OUTPUT
     const prep = must(
-      await agent(
+      await agentWithRetry(
         activeReviewers === null
           ? prepCommon +
               '3. .issue-loop/current-issue.md と .issue-loop/changes.diff を読み、以下のオプショナルレビュワーの要否を判断する:\n' +
@@ -491,7 +528,7 @@ try {
   // ── ステップ 9: PR検証 ───────────────────────────────
   // push / PR 作成の失敗を検知できないと次イテレーションで同じ Issue を選び続けるため、
   // PR の実在確認は独立したエージェントで行う
-  const verify = must(await agent(
+  const verify = must(await agentWithRetry(
     'git branch --show-current で現在のブランチ名を取得し、' +
       'gh pr list --head <ブランチ名> --state open --json number,url で PR の実在を確認してください。' +
       (reviewPassed

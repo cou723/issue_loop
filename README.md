@@ -62,13 +62,18 @@ Issue の情報が不足している場合はループを一時停止し、ユ�
 | `/issue-loop:consolidate-issues` | オープン Issue から同種の細粒度 Issue を洗い出して統合する。統合案を承認してから実行される（ループ終了後にも自動で呼ばれる） |
 | `/issue-loop:push-and-pr` | 現在の変更をコミット・プッシュして PR を作成する（ループ内から自動で呼ばれるが単体でも使用可） |
 
-`push-and-pr` のスクリーンショット撮影条件（監視パス・開発サーバーURL）は、対象プロジェクトの `.claude/issue-loop.local.md` の YAML フロントマターで上書きできる（`screenshot-watch-path` / `screenshot-url`）。未設定の場合はそれぞれ `apps/web/src/` / `http://localhost:5173/` がデフォルト値として使われる。
+`push-and-pr` のスクリーンショット撮影条件（監視パス・開発サーバーURL）は、対象プロジェクトの `.claude/issue-loop.local.md` の YAML フロントマターで上書きできる（`screenshot-watch-path` / `screenshot-url`）。未設定の場合はそれぞれ `apps/web/src/` / `http://localhost:5173/` がデフォルト値として使われる。なお private リポジトリではスクリーンショット関連処理自体がスキップされる。
 
 ### パーミッション設定
 
-プラグインの実行には **`acceptEdits` モード**（または同等の権限設定）が必要です。
+ループは git / gh / 定型ファイル操作を無人で発行する。auto mode や bypassPermissions に頼らずに運用するには、これらのコマンドを `permissions.allow` に事前登録する。
 
-対象プロジェクトの `.claude/settings.local.json` に以下を追加してください:
+workflow が起動するサブエージェントはセッションのモードに関係なく常に `acceptEdits` で動作し、settings の allowlist を継承する（[公式ドキュメント](https://code.claude.com/docs/en/workflows)）。したがってファイル編集の許可設定は不要で、**Bash ルールの整備だけでよい**。
+
+ルールは性質で2層に分かれる:
+
+1. **プラグイン共通**（どのプロジェクトでも同じ）: 下記の JSON。全プロジェクトで使うなら `~/.claude/settings.json`、プロジェクト単位なら対象プロジェクトの `.claude/settings.local.json` に置く
+2. **プロジェクト固有**: `implement` / `debug` エージェントが使うビルド・テストコマンド（例: `Bash(pnpm *)`）。対象プロジェクト側に置く
 
 ```json
 {
@@ -81,12 +86,14 @@ Issue の情報が不足している場合はループを一時停止し、ユ�
       "Bash(test -d .issue-loop)",
       "Bash(test -f .issue-loop/*)",
       "Bash(touch .issue-loop/cancel-requested)",
+      "Bash(cat .issue-loop/*)",
       "Bash(rm -f .issue-loop/*)",
       "Bash(rm -rf .issue-loop/close-check)",
       "Bash(ls .issue-loop/close-check*)",
-      "Bash(cat .issue-loop/close-check/*)",
       "Bash(python3 .issue-loop/analyze-results.py)",
       "Bash(mkdir -p *)",
+      "Bash(git status*)",
+      "Bash(git log *)",
       "Bash(git add *)",
       "Bash(git diff *)",
       "Bash(git commit *)",
@@ -109,9 +116,18 @@ Issue の情報が不足している場合はループを一時停止し、ユ�
       "Bash(curl *)",
       "Bash(echo *)",
       "Bash(base64 *)"
+    ],
+    "deny": [
+      "Bash(git push * --force*)",
+      "Bash(git push --force*)"
     ]
   }
 }
 ```
 
-このほか、`implement` / `debug` エージェントはテスト実行など任意のコマンドを実行しうるため、プロジェクトのビルド・テストコマンドも必要に応じて許可してください。
+注意点:
+
+- `git push` / `gh pr create` / `gh issue create` を allow に入れることは、**確認なしでの外部公開を許可する**ことを意味する（このループの目的そのものだが、意図して判断すること）
+- allowlist に載っていないコマンドが発行された場合は実行中にプロンプトになる。ループは停止せず承認待ちになり、`/workflows` から応答できる
+- 残るプロンプトの主因は `implement` / `debug` エージェントの自由なコマンド実行。数回実行した後に `/fewer-permission-prompts` で実測ベースの allowlist を育てるか、サンドボックス（`sandbox.enabled` + `autoAllowBashIfSandboxed`）で安全なコマンドを自動承認にすると収束が早い
+- Workflow の初回起動時には承認プロンプトが出る。「don't ask again」を選ぶと以後はスキップされる

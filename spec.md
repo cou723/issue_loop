@@ -7,7 +7,7 @@ Claude Code をはじめとするコーディングエージェントで動く�
 ### Skills（Claudeへの命令スキル）
 
 - **`/issueloop`**：ループのエントリポイント。セットアップ・ループ制御・ユーザーへの質問代行・キャンセル確認のみを担い、1イテレーションのオーケストレーションは dynamic workflow（`workflows/iteration.js`）へ委譲する
-- **`/push-and-pr`**：コミット・プッシュ・PR作成を一括実行する（`commit-commands:commit-push-pr` を流用）。フロントエンドの変更があり開発サーバーが起動している場合は、スクリーンショットを撮影して PR コメントに添付する。監視パスとURLは `.claude/issue-loop.local.md` で設定可能
+- **`/push-and-pr`**：コミット・プッシュ・PR作成を一括実行する（`commit-commands:commit-push-pr` を流用）。フロントエンドの変更があり開発サーバーが起動している場合は、スクリーンショットを撮影して PR コメントに添付する。監視パスとURLは `.claude/issue-loop.local.md` で設定可能。private リポジトリでは画像URLが認証なしで表示できないためスクリーンショット関連処理はスキップされる
 - **`/cancel`**：実行中のループをイテレーションの区切りで中断する（実行中のイテレーション自体の停止は `/workflows` ビューで行う）
 - **`/close-issues [N]`**：最新N件のマージ済みPRを対象に、関連するオープンIssueを一括クローズする。番号言及・ブランチ名・タイトル類似で候補ペアを絞り込んでから、各(PR, Issue)ペアの判定を `pr-resolves-issue` エージェントへ委譲して並列起動する
 - **`/consolidate-issues`**：オープンIssueから同種の細粒度Issueを洗い出して統合する（統合Issueの新規作成＋元Issueのクローズ）。統合案をユーザーへ提示し、承認されたグループのみ実行する。オープンPRが参照するIssueは自動クローズとトレーサビリティを壊すため対象外。`/issueloop` のループ終了後にも自動で呼ばれる

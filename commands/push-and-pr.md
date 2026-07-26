@@ -7,6 +7,14 @@ allowed-tools: ["Skill(commit-commands:commit-push-pr)", "Read", "Bash(git add *
 
 ## ステップ 1: スクリーンショット（UIの変更がある場合のみ）
 
+### 実行条件（リポジトリの公開設定）
+
+`gh repo view --json isPrivate -q '.isPrivate'` を実行する。`true`（private リポジトリ）の場合、本ステップおよびステップ3のスクリーンショット関連処理をすべてスキップする。
+
+- 理由: ステップ3で使う `raw.githubusercontent.com` の画像URLは、private リポジトリでは認証なしでアクセスできず、PRコメント上で画像が表示されないため
+
+以下、リポジトリが public の場合のみ続行する。
+
 ### 設定の読み込み
 
 Read ツールで `.claude/issue-loop.local.md` を読む（存在しなければデフォルト値を使う）。フロントマターから以下を取得する:
@@ -43,7 +51,7 @@ screenshot-url: http://localhost:5173/
 
 `commit-commands:commit-push-pr` スキルを実行してコミット・プッシュ・PR作成を一括実行する。
 
-## ステップ 3: スクリーンショットをPRコメントとして投稿（ステップ1で撮影した場合のみ）
+## ステップ 3: スクリーンショットをPRコメントとして投稿（ステップ1で撮影した場合のみ、private リポジトリではスキップ）
 
 1. `gh repo view --json owner,name -q '.owner.login + "/" + .name'` でリポジトリ名を取得する
 2. `git branch --show-current` で現在のブランチ名を取得する
